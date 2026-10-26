@@ -1,0 +1,856 @@
+diff --git a/src/components/BubbleResizeHandle.tsx b/src/components/BubbleResizeHandle.tsx
+new file mode 100644
+index 00000000..9bebb557
+--- /dev/null
++++ b/src/components/BubbleResizeHandle.tsx
+@@ -0,0 +1,93 @@
++import { useEffect, useRef, useState } from "react";
++
++import {
++  BUBBLE_DEFAULT_PX,
++  BUBBLE_EDGE,
++  BUBBLE_MAX_PX,
++  BUBBLE_MIN_PX,
++  applyBubbleWidth,
++  clampBubbleWidth,
++  loadBubbleWidth,
++  saveBubbleWidth,
++  type BubbleKind,
++} from "@/lib/bubble-width";
++
++/** Doble clic en el mango devuelve el ancho por defecto (pedido de Jose: un
++ * reset claro). El ancho vive por dispositivo (localStorage) y se aplica como
++ * variable CSS en :root, compartida por todas las burbujas de ese tipo. */
++export function BubbleResizeHandle({ kind, className }: { kind: BubbleKind; className?: string }) {
++  const [dragging, setDragging] = useState(false);
++  const current = useRef<number | null>(loadBubbleWidth(kind));
++  const edge = BUBBLE_EDGE[kind];
++
++  useEffect(() => {
++    if (!dragging) current.current = loadBubbleWidth(kind);
++  }, [dragging, kind]);
++
++  const commit = (px: number | null) => {
++    current.current = px;
++    saveBubbleWidth(kind, px);
++    applyBubbleWidth(kind, px);
++  };
++
++  // Medimos contra el contenedor: el ancho util de la burbuja es la distancia
++  // del puntero al borde opuesto del padre (el extremo fijo por el que se ancla).
++  const widthFromPointer = (handle: HTMLElement, clientX: number): number | null => {
++    const parent = handle.parentElement;
++    if (!parent) return null;
++    const rect = parent.getBoundingClientRect();
++    return edge === "right" ? clientX - rect.left : rect.right - clientX;
++  };
++
++  return (
++    <div
++      role="separator"
++      aria-label="Ajustar ancho (arrastra; doble clic para restablecer)"
++      aria-orientation="vertical"
++      aria-valuemin={BUBBLE_MIN_PX}
++      aria-valuemax={BUBBLE_MAX_PX[kind]}
++      aria-valuenow={clampBubbleWidth(kind, current.current ?? BUBBLE_DEFAULT_PX[kind])}
++      tabIndex={0}
++      data-bubble-resize={kind}
++      onPointerDown={(event) => {
++        if (event.button !== 0) return;
++        event.preventDefault();
++        event.stopPropagation();
++        event.currentTarget.setPointerCapture(event.pointerId);
++        setDragging(true);
++      }}
++      onPointerMove={(event) => {
++        if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
++        const next = widthFromPointer(event.currentTarget, event.clientX);
++        if (next === null) return;
++        const clamped = clampBubbleWidth(kind, next);
++        current.current = clamped;
++        event.currentTarget.setAttribute("aria-valuenow", String(clamped));
++        applyBubbleWidth(kind, clamped);
++      }}
++      onPointerUp={(event) => {
++        if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
++        setDragging(false);
++        commit(current.current);
++      }}
++      onPointerCancel={() => {
++        setDragging(false);
++        commit(current.current);
++      }}
++      onDoubleClick={(event) => {
++        event.preventDefault();
++        event.stopPropagation();
++        commit(null);
++      }}
++      onKeyDown={(event) => {
++        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
++        event.preventDefault();
++        const base = current.current ?? loadBubbleWidth(kind) ?? BUBBLE_DEFAULT_PX[kind];
++        // Flecha hacia "ensanchar" segun el borde libre de cada tipo.
++        const grow = (event.key === "ArrowRight" && edge === "right") || (event.key === "ArrowLeft" && edge === "left");
++        commit(clampBubbleWidth(kind, base + (grow ? 24 : -24)));
++      }}
++      className={className}
++    />
++  );
++}
+diff --git a/src/components/ChatView.controls.test.ts b/src/components/ChatView.controls.test.ts
+index d613b63c..fd8bab33 100644
+--- a/src/components/ChatView.controls.test.ts
++++ b/src/components/ChatView.controls.test.ts
+@@ -90,55 +90,45 @@ describe("Advanced mode in the header menu", () => {
+   });
+ });
+ 
+-describe("header name", () => {
+-  it("renames only from the bot's settings in Simple mode: no pencil, and the whole pill opens them", () => {
+-    fixture.advanced = false;
+-    const markup = renderToStaticMarkup(createElement(ChatView, { bot }));
+-    expect(markup).not.toContain('aria-label="Rename Pepper"');
+-    // one button holds the avatar and the name together
+-    const pill = markup.match(/<button[^>]*data-chathead-pill="true"[^>]*>([\s\S]*?)<\/button>/);
+-    expect(pill?.[0]).toContain('aria-label="Open Pepper&#x27;s profile"');
+-    expect(pill?.[1]).toContain(">Pepper</span>");
+-    expect(pill?.[0]).toContain("rounded-full");
+-    fixture.advanced = true;
+-  });
+-
+-  it("keeps the rename pencil in Advanced mode, inside the same pill as the avatar and name", () => {
++describe("header name (personalizacion Manager: solo el nombre, sin icono)", () => {
++  it("keeps the rename pencil in Advanced mode, with no avatar button in the header", () => {
+     fixture.advanced = true;
+     const markup = renderToStaticMarkup(createElement(ChatView, { bot }));
+-    const start = markup.indexOf('<div data-chathead-pill="true"');
++    const start = markup.indexOf("data-chathead-identity");
+     expect(start).toBeGreaterThan(-1);
+-    const pill = markup.slice(start, markup.indexOf("data-chathead-controls"));
+-    expect(pill).toContain('aria-label="Open Pepper&#x27;s profile"');
+-    expect(pill).toContain("Rename Pepper");
++    const identity = markup.slice(start, markup.indexOf("data-chathead-controls"));
++    expect(identity).toContain("Rename Pepper");
++    // el avatar ya no se dibuja como boton en la cabecera (sin <img>/BotAvatar)
++    expect(identity).not.toContain("<img");
++    expect(identity).not.toContain("data-chathead-pill");
+   });
+ 
+-  it("draws no working dots in the header pill, keeping one width, while a status still tells a screen reader", () => {
+-    for (const advanced of [true, false]) {
+-      fixture.advanced = advanced;
+-      const busyMarkup = renderToStaticMarkup(createElement(ChatView, { bot: { ...bot, busy: true, tasks: (bot.tasks ?? []).map((task) => ({ ...task, busy: true })) } }));
+-      const idleMarkup = renderToStaticMarkup(createElement(ChatView, { bot: { ...bot, busy: false } }));
+-      const pillOf = (markup: string) => {
+-        const start = markup.indexOf("data-chathead-pill");
+-        return markup.slice(start, markup.indexOf("data-chathead-status", start));
+-      };
+-      expect(pillOf(busyMarkup)).not.toContain("animate-status-pulse");
+-      // the same pill markup busy or not, so its width cannot change
+-      expect(pillOf(busyMarkup)).toBe(pillOf(idleMarkup));
+-      expect(busyMarkup).toMatch(/<span role="status" class="sr-only" data-chathead-status="true">Working…<\/span>/);
+-      expect(idleMarkup).toMatch(/<span role="status" class="sr-only" data-chathead-status="true"><\/span>/);
+-      // the turn stays visible without the dots: the header's Stop button
+-      expect(busyMarkup).toContain('title="Stop this turn"');
+-    }
+-    fixture.advanced = true;
++  it("keeps the status for a screen reader even without the avatar", () => {
++    const busyMarkup = renderToStaticMarkup(createElement(ChatView, { bot: { ...bot, busy: true, tasks: (bot.tasks ?? []).map((task) => ({ ...task, busy: true })) } }));
++    const idleMarkup = renderToStaticMarkup(createElement(ChatView, { bot: { ...bot, busy: false } }));
++    expect(busyMarkup).toMatch(/<span role="status" class="sr-only" data-chathead-status="true">Working…<\/span>/);
++    expect(idleMarkup).toMatch(/<span role="status" class="sr-only" data-chathead-status="true"><\/span>/);
++    expect(busyMarkup).toContain('title="Stop this turn"');
+   });
+ 
+-  it("centres the bot in the header's middle column, with the controls in the last", () => {
++  it("lays the header out as name on the left, controls on the right", () => {
+     const markup = renderToStaticMarkup(createElement(ChatView, { bot }));
+     const row = markup.match(/data-chathead-row="true" class="([^"]*)"/)?.[1] ?? "";
+-    expect(row).toContain("@min-[30rem]/chathead:grid-cols-[minmax(0,1fr)_minmax(0,auto)_minmax(max-content,1fr)]");
+-    expect(markup).toMatch(/data-chathead-identity="true" class="[^"]*@min-\[30rem\]\/chathead:col-start-2[^"]*justify-self-center/);
+-    expect(markup).toMatch(/data-chathead-controls="true" class="[^"]*@min-\[30rem\]\/chathead:col-start-3/);
++    expect(row).toContain("flex");
++    expect(markup).toMatch(/data-chathead-identity="true"/);
++    expect(markup).toMatch(/data-chathead-controls="true"/);
++    // Personalizacion Manager: a la IZQUIERDA van el selector de hilos y los
++    // botones de copiar/descargar; buscar, el uso, el modelo y «...» a la
++    // DERECHA.
++    const identity = markup.slice(markup.indexOf("data-chathead-identity"), markup.indexOf("data-chathead-controls"));
++    expect(identity).toContain("data-header-copy");
++    expect(identity).toContain("data-header-download");
++    expect(identity).toContain('aria-label="All threads"');
++    expect(identity).not.toContain("data-header-find");
++    const controls = markup.slice(markup.indexOf("data-chathead-controls"), markup.indexOf("data-composer-row"));
++    expect(controls).toContain("data-header-find");
++    expect(controls).not.toContain("data-header-copy");
++    expect(controls).not.toContain("data-header-download");
+   });
+ });
+ 
+@@ -161,10 +151,11 @@ describe("glass header", () => {
+ });
+ 
+ describe("thread control placement", () => {
+-  it.each([true, false])("leaves All threads to the sidebar in both modes (advanced: %s)", (advanced) => {
++  it.each([true, false])("shows the All threads picker in the header in both modes (advanced: %s)", (advanced) => {
+     fixture.advanced = advanced;
+     const markup = renderToStaticMarkup(createElement(ChatView, { bot }));
+-    expect(markup).not.toContain('aria-label="All threads"');
++    // Personalizacion Manager: el selector de hilos vive ahora en la cabecera.
++    expect(markup).toContain('aria-label="All threads"');
+     expect(markup).toContain('data-testid="chat-more"');
+     fixture.advanced = true;
+   });
+@@ -389,7 +380,7 @@ describe("thread control placement", () => {
+     const row = /data-chathead-row="[^"]*" class="([^"]*)"/.exec(markup)!;
+     expect(row[1].split(" ")).toContain("@max-[30rem]/chathead:flex-wrap");
+     const identity = /data-chathead-identity="[^"]*" class="([^"]*)"/.exec(markup)!;
+-    expect(identity[1].split(" ")).toEqual(expect.arrayContaining(["min-w-0", "@max-[30rem]/chathead:basis-full"]));
++    expect(identity[1].split(" ")).toEqual(expect.arrayContaining(["min-w-0"]));
+     const controls = /data-chathead-controls="[^"]*" class="([^"]*)"/.exec(markup)!;
+     expect(controls[1].split(" ")).toEqual(expect.arrayContaining(["shrink-0", "@max-[30rem]/chathead:ml-auto", "@max-[30rem]/chathead:flex-wrap"]));
+   });
+diff --git a/src/components/ChatView.tsx b/src/components/ChatView.tsx
+index cb7a57f2..5129955a 100644
+--- a/src/components/ChatView.tsx
++++ b/src/components/ChatView.tsx
+@@ -30,7 +30,7 @@ import { useSpeech } from "@/lib/tts/useSpeech";
+ import { localSystemVoiceActive } from "@/lib/local-voice";
+ import { computerStartLine } from "@/lib/computer-start";
+ import { useCaptionChrome, useDesktopCapabilities } from "@/components/DesktopCapabilities";
+-import { contextChip, contextDetail, contextShare, costCaption, formatUsd, hasFiniteCost, lastTurnDetail, usageChip, usageDetail } from "@/lib/usage";
++import { contextChip, contextDetail, contextShare, costCaption, formatTokens, formatUsd, hasFiniteCost, lastTurnDetail, uncachedInput, usageChip, usageDetail } from "@/lib/usage";
+ import {
+   api,
+   currentTaskBot,
+@@ -63,7 +63,7 @@ import { isCancelledTranscriptRow } from "../../shared/client-cancel";
+ import { BotAvatar } from "./Avatar";
+ import { TurnPresence } from "./TurnPresence";
+ import { showToolCallsEnabled, skillAuthoringEnabled } from "@/lib/feature-flags";
+-import { normalizeState, stateForBot } from "@/lib/mascot";
++import { normalizeState } from "@/lib/mascot";
+ import { peerLine, peerRequest, type PeerLine } from "@/lib/peer-message";
+ import { showWorkingDots } from "@/lib/turn-tail";
+ import { liveActivityPhrases } from "@/lib/live-activity";
+@@ -92,7 +92,9 @@ import { AttachmentGallery, collectMessageFiles, replyAttachmentGroup, splitMess
+ import { ScreenFrame } from "./ScreenFrame";
+ import { CompactionChip, DigestChip } from "./DigestChip";
+ import { RenameTitle } from "./RenameTitle";
+-import { BotActivityPicker } from "./TaskPicker";
++import { BotActivityPicker, TaskPicker } from "./TaskPicker";
++import { BubbleResizeHandle } from "./BubbleResizeHandle";
++import { applyStoredBubbleWidths } from "@/lib/bubble-width";
+ import { ModelPicker } from "./ModelPicker";
+ import { SidebarPopoverMenu, type SidebarMenuItem } from "./SidebarPopoverMenu";
+ import { ShortcutHint } from "./ShortcutHint";
+@@ -399,7 +401,7 @@ export class MessageBoundary extends Component<{ children: ReactNode; fallbackTe
+   render() {
+     if (this.state.failed) {
+       return (
+-        <div className="chat-text w-fit max-w-[min(42rem,78%)] rounded-2xl bg-card px-4 py-2.5 text-[15px] leading-relaxed whitespace-pre-wrap text-ink">
++        <div className="chat-text bbl bbl-bot w-fit rounded-2xl bg-card px-4 py-2.5 text-[15px] leading-relaxed whitespace-pre-wrap text-ink">
+           {this.props.fallbackText}
+         </div>
+       );
+@@ -432,7 +434,7 @@ function BubbleEditor({
+     if (draft.trim()) onSubmit(draft.trim());
+   };
+   return (
+-    <div className="w-full max-w-[min(42rem,78%)] rounded-2xl border border-hairline/40 bg-bubble-user px-4 py-3">
++    <div className="bbl bbl-user w-full rounded-2xl border border-hairline/40 bg-bubble-user px-4 py-3">
+       <textarea
+         ref={ref}
+         dir="auto"
+@@ -602,7 +604,9 @@ const Bubble = memo(function Bubble({
+         <div
+           data-chat-bubble
+           className={cn(
+-            "w-fit max-w-[min(42rem,78%)] rounded-2xl text-[15px] leading-relaxed",
++            "relative w-fit rounded-2xl text-[15px] leading-relaxed",
++            "bbl",
++            user ? "bbl-user" : "bbl-bot",
+             emerging && "turn-answer",
+             user && webhookView
+               ? "overflow-hidden border border-accent/25 bg-card text-ink shadow-[0_10px_30px_rgba(0,0,0,0.18)]"
+@@ -614,6 +618,7 @@ const Bubble = memo(function Bubble({
+           )}
+           title={new Date(message.at).toLocaleString()}
+         >
++          {!webhookView && <BubbleResizeHandle kind={user ? "user" : "bot"} className="bbl-handle" />}
+           {replyTarget && (
+             <div className="mb-2">
+               <ReplyQuote
+@@ -1125,9 +1130,6 @@ function PinnedBanner({
+   );
+ }
+ 
+-/** The chat header's bot pill: the model chip's shape and tint. */
+-const CHATHEAD_PILL = "flex min-w-0 items-center gap-2 rounded-full border border-hairline/40 bg-control/60 py-0.5 pl-1.5 text-ink";
+-
+ function chiefOfStaffBadge(bot: Bot) {
+   if (!bot.chiefOfStaff) return null;
+   // One line, never shrinking with the name (it wrapped "Chief / of /
+@@ -1151,13 +1153,13 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
+   const { dragProps: headerDragProps, noDragStyle: headerNoDragStyle, controlsShiftStyle } = useCaptionChrome();
+   const composerDockRef = useRef<HTMLDivElement>(null);
+   const composerDock = useComposerDockPad(composerDockRef);
+-  const advanced = useAdvancedMode();
+   // A guest on an OMB Cloud home writes only in conversations it opened.
+   const canWrite = useCanWriteIn(bot.threadId);
+ 
+   const computerStarting = computerStartLine(state.computerStarts[bot.id], bot.name);
+-  const mascotMotion = state.mascotMotion?.botId === bot.id ? state.mascotMotion : null;
+   const [findOpen, setFindOpen] = useState(false);
++  // Personalizacion Manager: aplica los anchos de burbuja guardados (por dispositivo).
++  useEffect(() => { applyStoredBubbleWidths(); }, []);
+   const { replyTo, selectReply, clearReply, consumeReply, restoreReply } = useReplyDraft(
+     bot.threadId,
+     `bot:${bot.id}:${bot.threadId}`,
+@@ -1238,9 +1240,6 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
+   const localVoice = localSystemVoiceActive();
+   const locale = activeLocale();
+   const busy = Boolean(bot.busy);
+-  // The header face moves only while the bot works or plays a motion beat,
+-  // as in the sidebar: a resting face left open would redraw at display rate.
+-  const headerAnimated = busy || (mascotMotion?.kind ?? "none") !== "none";
+   // read when a citation is clicked, so the rows need not change per message
+   const branch = useRef(messages);
+   branch.current = messages;
+@@ -1356,12 +1355,15 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
+       {/* Header */}
+       <div
+         {...headerDragProps}
++        data-chathead-pad=""
+         className={cn(
+           // @container so the chips on the right can fold to icon bubbles
+           // when the column is narrow (side panel open, small window). A
+           // container query never matches the container itself, so the row
+           // that has to wrap is the child below, not this element.
+-          "@container/chathead px-5 py-3",
++          // El padding vertical (arriba/abajo) vive en styles.css como
++          // --chathead-pad-top/bottom (personalizacion Manager, reversible).
++          "@container/chathead px-5",
+           // Room for the drawer button, which overlays this corner below md.
+           "pl-11 md:pl-5",
+         )}
+@@ -1375,82 +1377,39 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
+             itself. The controls' column never goes below their own width;
+             when room is short it takes it from the empty side, which slides
+             the name left rather than under the controls. */}
+-        <div data-chathead-row className="flex items-center justify-between @max-[30rem]/chathead:flex-wrap @max-[30rem]/chathead:gap-y-1 @min-[30rem]/chathead:grid @min-[30rem]/chathead:grid-cols-[minmax(0,1fr)_minmax(0,auto)_minmax(max-content,1fr)]">
+-        <div data-chathead-identity className="flex min-w-0 items-center gap-2 @max-[30rem]/chathead:basis-full @min-[30rem]/chathead:col-start-2 @min-[30rem]/chathead:justify-self-center" style={headerNoDragStyle}>
+-          {/* The bot as one pill, the same shape as the model chip across the
+-              header: avatar and name together, opening the bot's settings.
+-              Simple mode makes the whole pill that one button; Advanced keeps
+-              the rename pencil inside it, so the avatar and the name stay
+-              their own buttons (a button cannot hold another). */}
+-          {advanced ? (
+-            <div data-chathead-pill className={cn(CHATHEAD_PILL, "pr-1")}>
+-              <button
+-                type="button"
+-                onClick={() => dispatch({ type: "toggleSettings", open: true })}
+-                className="flex shrink-0 items-center justify-center rounded-full"
+-                title={t("chat.openProfile")}
+-                aria-label={t("chat.openProfileAria", { name: bot.name })}
+-              >
+-                <BotAvatar
+-                  bot={bot}
+-                  state={stateForBot({ ...bot, messages })}
+-                  size={24}
+-                  motion={mascotMotion?.kind ?? "none"}
+-                  motionKey={mascotMotion?.nonce ?? 0}
+-                  animated={headerAnimated}
+-                />
+-              </button>
+-              <RenameTitle
+-                value={bot.name}
+-                onCommit={(name) => {
+-                  if (window.ogb?.remoteClient?.active) {
+-                    void api(`/api/bots/${bot.id}/profile`, { method: "PATCH", body: JSON.stringify({ name }) })
+-                      .then(({ bot: updated }) => dispatch({ type: "botPatched", bot: updated }))
+-                      .catch((cause) => dispatch({ type: "error", message: cause instanceof Error ? cause.message : String(cause) }));
+-                  } else {
+-                    dispatch({ type: "updateBot", botId: bot.id, patch: { name } });
+-                  }
+-                }}
+-                onActivate={() => dispatch({ type: "toggleSettings", open: true })}
+-                showEditButton
+-                className="truncate text-[14px] font-semibold text-ink"
+-                editButtonClassName="size-6 rounded-full"
+-                inputClassName="max-w-[220px] rounded-full bg-inset px-2 py-0.5 text-[14px] font-semibold"
+-              />
+-              {chiefOfStaffBadge(bot)}
+-            </div>
+-          ) : (
+-            <button
+-              type="button"
+-              data-chathead-pill
+-              onClick={() => dispatch({ type: "toggleSettings", open: true })}
+-              title={t("chat.openProfile")}
+-              aria-label={t("chat.openProfileAria", { name: bot.name })}
+-              className={cn(CHATHEAD_PILL, "pr-3.5 hover:bg-raised-hover")}
+-            >
+-              <BotAvatar
+-                bot={bot}
+-                state={stateForBot({ ...bot, messages })}
+-                size={24}
+-                motion={mascotMotion?.kind ?? "none"}
+-                motionKey={mascotMotion?.nonce ?? 0}
+-                animated={headerAnimated}
+-              />
+-              <span className="min-w-0 truncate text-[14px] font-semibold text-ink">{bot.name}</span>
+-              {chiefOfStaffBadge(bot)}
+-            </button>
+-          )}
+-          {/* The pill draws no activity of its own: the sidebar avatar's
+-              presence dot, the Stop button beside the model chip and the
+-              composer already say a turn is running, at every width. The
+-              pill keeps one width either way, and a screen reader still
+-              hears when the bot starts working. */}
++        <div data-chathead-row className="flex items-center gap-2 @max-[30rem]/chathead:flex-wrap @max-[30rem]/chathead:gap-y-1">
++        <div data-chathead-identity className="flex min-w-0 items-center gap-2" style={headerNoDragStyle}>
++          {/* Personalizacion Manager: solo el nombre (sin icono) y el lapiz de
++              renombrar. El avatar/ajustes siguen accesibles desde la barra
++              lateral y el lapiz sigue abriendo el perfil. */}
++          <RenameTitle
++            value={bot.name}
++            onCommit={(name) => {
++              if (window.ogb?.remoteClient?.active) {
++                void api(`/api/bots/${bot.id}/profile`, { method: "PATCH", body: JSON.stringify({ name }) })
++                  .then(({ bot: updated }) => dispatch({ type: "botPatched", bot: updated }))
++                  .catch((cause) => dispatch({ type: "error", message: cause instanceof Error ? cause.message : String(cause) }));
++              } else {
++                dispatch({ type: "updateBot", botId: bot.id, patch: { name } });
++              }
++            }}
++            onActivate={() => dispatch({ type: "toggleSettings", open: true })}
++            showEditButton
++            className="min-w-0 truncate text-[15px] font-semibold text-ink"
++            editButtonClassName="size-6 shrink-0 rounded-full"
++            inputClassName="max-w-[220px] rounded bg-inset px-1.5 py-0.5 text-[15px] font-semibold"
++          />
++          {chiefOfStaffBadge(bot)}
+           <span role="status" className="sr-only" data-chathead-status>{bot.busy ? t("sidebar.preview.working") : ""}</span>
+           {!bot.busy && bot.waitingForTeammates && <span className="truncate text-[12px] text-ink-secondary" role="status">Teammates working</span>}
++          {/* 1) Selector de hilos de conversacion y 2/3) Copiar + Descargar:
++              pegados al nombre, en el grupo de la IZQUIERDA (pedido de Jose). */}
++          <TaskPicker bot={bot} />
++          <ChatHeaderExport bot={bot} messages={messages} />
+         </div>
+         <div
+           data-chathead-controls
+-          className="flex shrink-0 items-center gap-2 @max-[30rem]/chathead:ml-auto @max-[30rem]/chathead:flex-wrap @max-[30rem]/chathead:justify-end @min-[30rem]/chathead:col-start-3 @min-[30rem]/chathead:justify-self-end"
++          className="ml-auto flex shrink-0 items-center gap-2 @max-[30rem]/chathead:ml-auto @max-[30rem]/chathead:flex-wrap @max-[30rem]/chathead:justify-end"
+           // The caption buttons sit over the header's right end; drop this
+           // icon row 16px (visual only — the header keeps its height) so the
+           // buttons clear the 26px overlay while the rest of the layout stays.
+@@ -1469,9 +1428,15 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
+               <span className="@max-4xl/chathead:hidden">{t("chat.stop")}</span>
+             </button>
+           )}
+-          {!remoteClient && <ModelPicker key={bot.threadId} bot={bot} threadId={bot.threadId} />}
+-          {/* below md the sidebar (and its Live call pill) is hidden */}
++          {/* 4) Buscar en la conversacion (copiar/descargar viven ahora en la
++              izquierda, junto al nombre). */}
++          <ChatHeaderFind findOpen={findOpen} onFind={() => setFindOpen((open) => !open)} />
++          {/* 5) Uso: SIEMPRE uncached + ctx % (decision de Jose). */}
++          <HeaderUsageChip bot={bot} />
++          {/* Chips de estado (solo aparecen si hay algo que decir, no ensucian
++              la barra salvo durante una llamada en vivo). */}
+           <LiveCallChip currentBotId={bot.id} onOpen={(botId, threadId) => openThread(dispatch, { botId, threadId }, state)} />
++          {!remoteClient && <ModelPicker key={bot.threadId} bot={bot} threadId={bot.threadId} />}
+           <button
+             data-tour="computer"
+             onClick={() => dispatch({ type: "toggleComputer" })}
+@@ -1483,8 +1448,7 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
+           >
+             <Monitor size={18} />
+           </button>
+-          {/* Keep threads reachable even when the sidebar is collapsed.
+-              Less frequent actions share one menu. */}
++          {/* 6) Mas: lo que ya vivia aqui (Activity, Inspector, export, etc.). */}
+           <ChatHeaderMenu key={`menu:${bot.threadId}`} bot={bot} messages={messages} findOpen={findOpen} onFind={() => setFindOpen((open) => !open)} />
+         </div>
+         </div>
+@@ -1712,6 +1676,93 @@ export function NewConversationInstead({ onNew }: { onNew: () => void }) {
+   );
+ }
+ 
++/** Personalizacion Manager (0004): los tres controles que Jose pidio ver
++ * siempre en la cabecera — copiar como Markdown, descargar .md y buscar.
++ * Comparten el mismo comportamiento que sus entradas del menu "...". */
++/** Personalizacion Manager (0004): copiar como Markdown y descargar .md viven
++ * junto al nombre, en el grupo de la IZQUIERDA de la cabecera (pedido de Jose). */
++function ChatHeaderExport({ bot, messages }: { bot: Bot; messages: readonly Message[] }) {
++  const [copyStatus, setCopyStatus] = useState<"copied" | "failed" | null>(null);
++  const hasMessages = messages.length > 0;
++  const transcript = () => formatTranscriptMarkdown({ title: bot.name, messages, botName: bot.name, isGroup: false });
++  const iconButton = "rounded-md p-1.5 hover:bg-raised disabled:opacity-40 disabled:hover:bg-transparent";
++  return (
++    <>
++      <button
++        type="button"
++        data-header-copy
++        disabled={!hasMessages}
++        onClick={() => { void copyTranscriptToClipboard(transcript()).then((ok) => setCopyStatus(ok ? "copied" : "failed")); }}
++        className={cn(iconButton, copyStatus ? "text-accent" : "text-ink-secondary hover:text-ink")}
++        title={copyStatus === "copied" ? t("chat.export.copied") : copyStatus === "failed" ? t("chat.export.copyFailed") : t("chat.export.copy")}
++        aria-label={t("chat.export.copy")}
++      >
++        <Copy size={18} />
++      </button>
++      <button
++        type="button"
++        data-header-download
++        disabled={!hasMessages}
++        onClick={() => downloadMarkdownTranscript(slugifyTranscriptFilename(bot.name), transcript())}
++        className={cn(iconButton, "text-ink-secondary hover:text-ink")}
++        title={t("chat.export.download")}
++        aria-label={t("chat.export.download")}
++      >
++        <Download size={18} />
++      </button>
++    </>
++  );
++}
++
++/** Personalizacion Manager (0004): buscar queda en el grupo de la DERECHA. */
++function ChatHeaderFind({ findOpen, onFind }: { findOpen: boolean; onFind: () => void }) {
++  const iconButton = "rounded-md p-1.5 hover:bg-raised disabled:opacity-40 disabled:hover:bg-transparent";
++  return (
++    <button
++      type="button"
++      data-header-find
++      onClick={onFind}
++      aria-label={t("chat.find")}
++      aria-pressed={findOpen}
++      className={cn(iconButton, findOpen ? "text-accent" : "text-ink-secondary hover:text-ink")}
++      title={t("chat.findShortcut")}
++    >
++      <Search size={18} />
++    </button>
++  );
++}
++
++/** Personalizacion Manager (0004): el uso en la cabecera, SIEMPRE como
++ * uncached + ctx % (decision de Jose 2026-10-14), nunca el coste. */
++function HeaderUsageChip({ bot }: { bot: Bot }) {
++  const { dispatch } = useStore();
++  const usage = bot.tasks?.find((task) => task.threadId === bot.threadId)?.usage;
++  if (!usage) return null;
++  const ctx = contextChip(usage);
++  const share = contextShare(usage);
++  const uncached = formatTokens(uncachedInput(usage));
++  if (!usageChip(usage) && !ctx) return null;
++  const detail = [
++    usage.turns === 1 ? t("chat.usage.turnsOne") : t("chat.usage.turnsMany", { count: usage.turns }),
++    usageDetail(usage),
++    lastTurnDetail(usage),
++    contextDetail(usage),
++    share?.tone === "danger" ? t("chat.usage.contextNudge") : null,
++  ].filter(Boolean).join("\n");
++  return (
++    <button
++      type="button"
++      onClick={() => dispatch({ type: "toggleSettings", open: true, section: "usage" })}
++      className="flex items-center gap-1.5 whitespace-nowrap rounded-full border border-hairline/40 bg-raised/60 px-2.5 py-1 text-[12px] tabular-nums text-ink-secondary hover:bg-raised hover:text-ink"
++      title={detail}
++      data-testid="header-usage"
++    >
++      <span>{t("chat.usage.uncachedShort", { tokens: uncached })}</span>
++      {ctx && <span className={cn(share?.tone === "danger" ? "text-danger" : share?.tone === "warning" ? "text-warning" : "opacity-70")}>{ctx}</span>}
++    </button>
++  );
++}
++
+ /** The thread's usage, folded to one figure for the header menu — cost when
+  * the engine reports one, else new tokens — with the full breakdown as the
+  * tooltip. Null while the thread has no usage yet. */
+diff --git a/src/components/GoalRunCard.tsx b/src/components/GoalRunCard.tsx
+index 900b9248..29905e48 100644
+--- a/src/components/GoalRunCard.tsx
++++ b/src/components/GoalRunCard.tsx
+@@ -58,7 +58,7 @@ export function GoalRunCard({ message }: { message: Message }) {
+   if (!run) {
+     const fallback = compact(message.text, DETAIL_LIMIT);
+     return fallback ? (
+-      <div className="w-fit max-w-[min(42rem,88%)] rounded-2xl bg-card px-4 py-2.5 text-[14px] leading-relaxed text-ink">
++      <div className="w-fit max-w-[min(42rem,95%)] rounded-2xl bg-card px-4 py-2.5 text-[14px] leading-relaxed text-ink">
+         {fallback}
+       </div>
+     ) : null;
+@@ -74,7 +74,7 @@ export function GoalRunCard({ message }: { message: Message }) {
+   return (
+     <section
+       aria-label={`Goal run: ${copy.label}`}
+-      className={cn("w-full max-w-[680px] rounded-2xl border bg-card px-3.5 py-3 shadow-sm", copy.border)}
++      className={cn("w-full max-w-[760px] rounded-2xl border bg-card px-3.5 py-3 shadow-sm", copy.border)}
+     >
+       <div className="flex items-start gap-3">
+         <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl bg-inset">
+diff --git a/src/components/RoutineRunCard.tsx b/src/components/RoutineRunCard.tsx
+index b9846fb0..af6b5335 100644
+--- a/src/components/RoutineRunCard.tsx
++++ b/src/components/RoutineRunCard.tsx
+@@ -65,7 +65,7 @@ export function RoutineRunCard({
+   if (!run) {
+     const fallback = compactDetail(message.text);
+     return fallback ? (
+-      <div className="w-fit max-w-[min(42rem,88%)] rounded-2xl bg-card px-4 py-2.5 text-[14px] leading-relaxed text-ink">
++      <div className="w-fit max-w-[min(42rem,95%)] rounded-2xl bg-card px-4 py-2.5 text-[14px] leading-relaxed text-ink">
+         {fallback}
+       </div>
+     ) : null;
+@@ -86,7 +86,7 @@ export function RoutineRunCard({
+   return (
+     <section
+       aria-label={`${run.routineName} routine run: ${copy.label}`}
+-      className="w-full max-w-[680px] rounded-xl border border-hairline/45 bg-card px-4 py-3"
++      className="w-full max-w-[760px] rounded-xl border border-hairline/45 bg-card px-4 py-3"
+     >
+       <div className="flex items-start gap-3">
+         <div className="min-w-0 flex-1">
+diff --git a/src/components/ScreenFrame.test.ts b/src/components/ScreenFrame.test.ts
+index 146f98ce..dba32848 100644
+--- a/src/components/ScreenFrame.test.ts
++++ b/src/components/ScreenFrame.test.ts
+@@ -30,7 +30,7 @@ describe("screen frame preview", () => {
+     expect(html).toContain("group-hover/image:opacity-100");
+     expect(html).toContain("group-focus-within/image:opacity-100");
+     // the frame keeps its transcript sizing
+-    expect(html).toContain("max-w-[min(42rem,78%)]");
++    expect(html).toContain("max-w-[min(42rem,90%)]");
+     expect(html).not.toContain("role=\"dialog\"");
+   });
+ 
+diff --git a/src/components/ScreenFrame.tsx b/src/components/ScreenFrame.tsx
+index 87906dae..18c24238 100644
+--- a/src/components/ScreenFrame.tsx
++++ b/src/components/ScreenFrame.tsx
+@@ -33,7 +33,7 @@ export function ScreenFrame({ threadId, message }: { threadId: string; message:
+         type="button"
+         onClick={() => setOpen(true)}
+         aria-label={t("attach.previewAria", { name: image.name })}
+-        className="group/image relative w-fit max-w-[min(42rem,78%)] overflow-hidden rounded-2xl border border-hairline/40 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
++        className="group/image relative w-fit max-w-[min(42rem,90%)] overflow-hidden rounded-2xl border border-hairline/40 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+       >
+         <img
+           src={image.src}
+diff --git a/src/components/VerifyCard.test.ts b/src/components/VerifyCard.test.ts
+index 8a29ec0e..796f324b 100644
+--- a/src/components/VerifyCard.test.ts
++++ b/src/components/VerifyCard.test.ts
+@@ -24,7 +24,7 @@ describe("VerifyCard", () => {
+   it("lists each step with its label, full command and status, tagging the verified ones, behind labelled controls", () => {
+     const markup = render();
+     expect(markup).toContain(`aria-label="${t("chat.verify.aria")}"`);
+-    expect(markup).toContain('class="pointer-events-auto ');
++    expect(markup).toContain('class="bbl bbl-run pointer-events-auto ');
+     expect(markup).toContain(`>${t("chat.verify.title")}<`);
+     expect(markup).toContain("3 steps · 2 verified · 1 failed · 1 running");
+     expect(markup).toContain(">doctor<");
+diff --git a/src/components/VerifyCard.tsx b/src/components/VerifyCard.tsx
+index 491e6e93..57b89082 100644
+--- a/src/components/VerifyCard.tsx
++++ b/src/components/VerifyCard.tsx
+@@ -4,6 +4,7 @@ import { useState } from "react";
+ import { cn } from "@/lib/cn";
+ import { t } from "@/lib/i18n";
+ import { runSummary, type RunSkill, type RunStep } from "@/lib/verify-steps";
++import { BubbleResizeHandle } from "./BubbleResizeHandle";
+ 
+ function StatusIcon({ status }: { status: RunStep["status"] }) {
+   const className = "size-4 shrink-0";
+@@ -51,7 +52,7 @@ export function VerifyCard({
+   return (
+     <section
+       aria-label={t("chat.verify.aria")}
+-      className="pointer-events-auto w-[22rem] max-w-full rounded-2xl border border-hairline/40 bg-raised/95 text-ink shadow-lg backdrop-blur-sm"
++      className="bbl bbl-run pointer-events-auto rounded-2xl border border-hairline/40 bg-raised/95 text-ink shadow-lg backdrop-blur-sm"
+     >
+       <div className="flex items-center gap-2 px-3 py-2">
+         <ListChecks size={14} className="shrink-0 text-accent" aria-hidden="true" />
+@@ -114,6 +115,7 @@ export function VerifyCard({
+           )}
+         </>
+       )}
++      <BubbleResizeHandle kind="run" className="bbl-handle" />
+     </section>
+   );
+ }
+diff --git a/src/lib/bubble-width.ts b/src/lib/bubble-width.ts
+new file mode 100644
+index 00000000..b04bb35f
+--- /dev/null
++++ b/src/lib/bubble-width.ts
+@@ -0,0 +1,94 @@
++// Personalizacion Manager: ancho de las burbujas ajustable por el usuario.
++//
++// Cada categoria tiene su propia variable CSS y su propio ancho persistido por
++// dispositivo (localStorage), igual que la barra lateral. El ancho se aplica
++// como max-width de la burbuja; el mango de arrastre vive en el borde libre
++// (derecha en las del bot, izquierda en las del usuario y en "This run").
++
++export type BubbleKind = "bot" | "user" | "run";
++
++export const BUBBLE_CSS_VAR: Record<BubbleKind, string> = {
++  bot: "--bubble-bot",
++  user: "--bubble-user",
++  run: "--bubble-run",
++};
++
++export const BUBBLE_DEFAULT_PX: Record<BubbleKind, number> = {
++  bot: 900,
++  user: 900,
++  run: 720,
++};
++
++export const BUBBLE_MIN_PX = 320;
++// Personalizacion Manager (2026-10-14): tope de arrastre mas alto, y aun mas
++// para la tarjeta "This run". El limite efectivo en pantalla sigue siendo el
++// porcentaje de styles.css (90% general, 95% para "This run").
++export const BUBBLE_MAX_PX: Record<BubbleKind, number> = {
++  bot: 1800,
++  user: 1800,
++  run: 2200,
++};
++
++const STORAGE_KEY: Record<BubbleKind, string> = {
++  bot: "omb-bubble-width-bot",
++  user: "omb-bubble-width-user",
++  run: "omb-bubble-width-run",
++};
++
++/** Borde libre de cada burbuja: el del bot es el derecho; los otros, el izquierdo. */
++export const BUBBLE_EDGE: Record<BubbleKind, "left" | "right"> = {
++  bot: "right",
++  user: "left",
++  run: "left",
++};
++
++function storage(): Storage | undefined {
++  try {
++    return globalThis.localStorage;
++  } catch {
++    return undefined;
++  }
++}
++
++export function clampBubbleWidth(kind: BubbleKind, px: number): number {
++  if (!Number.isFinite(px)) return BUBBLE_DEFAULT_PX[kind];
++  return Math.max(BUBBLE_MIN_PX, Math.min(BUBBLE_MAX_PX[kind], Math.round(px)));
++}
++
++/** Ancho guardado, o null si el usuario nunca lo ajusto (usa el default). */
++export function loadBubbleWidth(kind: BubbleKind): number | null {
++  try {
++    const raw = storage()?.getItem(STORAGE_KEY[kind]);
++    if (raw == null) return null;
++    const n = Number(raw);
++    return Number.isFinite(n) ? clampBubbleWidth(kind, n) : null;
++  } catch {
++    return null;
++  }
++}
++
++export function saveBubbleWidth(kind: BubbleKind, px: number | null): void {
++  try {
++    if (px == null) storage()?.removeItem(STORAGE_KEY[kind]);
++    else storage()?.setItem(STORAGE_KEY[kind], String(clampBubbleWidth(kind, px)));
++  } catch {
++    // storage bloqueado: el ancho vale para esta sesion, no persiste.
++  }
++}
++
++/** Escribe la variable CSS; con null vuelve al default de la hoja de estilos. */
++export function applyBubbleWidth(kind: BubbleKind, px: number | null): void {
++  try {
++    const root = globalThis.document?.documentElement;
++    if (!root) return;
++    if (px == null) root.style.removeProperty(BUBBLE_CSS_VAR[kind]);
++    else root.style.setProperty(BUBBLE_CSS_VAR[kind], `${clampBubbleWidth(kind, px)}px`);
++  } catch {
++    // sin DOM (SSR/tests): nada que aplicar.
++  }
++}
++
++/** Aplica lo guardado al arrancar; se llama una vez desde el modulo de chat. */
++export function applyStoredBubbleWidths(): void {
++  (Object.keys(BUBBLE_CSS_VAR) as BubbleKind[]).forEach((kind) => applyBubbleWidth(kind, loadBubbleWidth(kind)));
++}
+diff --git a/src/styles.css b/src/styles.css
+index b58cc617..ba200c2b 100644
+--- a/src/styles.css
++++ b/src/styles.css
+@@ -669,6 +669,71 @@
+   text-align: start;
+ }
+ 
++/* ────────────────────────────────────────────────────────────────────────
++   PERSONALIZACION MANAGER — ancho de burbujas ajustable (parche 0006)
++   Cada burbuja toma su max-width de una variable en :root. Sin mango tocado,
++   las variables no existen y manda el valor por defecto de aqui. El usuario
++   puede ensanchar/adelgazar arrastrando el mango del borde libre; doble clic
++   en el mango vuelve al valor por defecto (por dispositivo, localStorage).
++   ──────────────────────────────────────────────────────────────────────── */
++.bbl {
++  max-width: 90%;
++}
++.bbl-bot,
++.bbl-user {
++  max-width: min(var(--bubble-bot, 900px), 90%);
++}
++.bbl-user {
++  max-width: min(var(--bubble-user, 900px), 90%);
++}
++.bbl-run {
++  width: min(var(--bubble-run, 720px), 95%);
++  max-width: 95%;
++}
++
++/* Personalizacion Manager: alineacion vertical de la cabecera del chat. Jose
++   pidio menos espacio ARRIBA y mas ABAJO, para centrar los controles (nombre,
++   hilos, buscar, modelo...) en la barra, cuya mitad inferior es translucida
++   (el cristal se desvanece en los ultimos ~20px). El alto total de la barra
++   no cambia (6 + 31 + 18 = 55, igual que el py-3 original 12 + 31 + 12).
++   REVERSIBLE: pon ambos a 12px y queda exactamente como antes. */
++:root {
++  --chathead-pad-top: 6px;
++  --chathead-pad-bottom: 18px;
++}
++[data-chathead-pad] {
++  padding-top: var(--chathead-pad-top);
++  padding-bottom: var(--chathead-pad-bottom);
++}
++
++/* El mango solo existe en escritorio: en tactil no hay hover y chocaria con
++   el scroll y la seleccion de texto. */
++.bbl {
++  position: relative;
++}
++.bbl-handle {
++  position: absolute;
++  top: 0;
++  bottom: 0;
++  width: 5px;
++  cursor: col-resize;
++  touch-action: none;
++  opacity: 0;
++  border-radius: 9999px;
++  transition: opacity 120ms ease, background-color 120ms ease;
++}
++.bbl-bot > .bbl-handle { right: -6px; }
++.bbl-user > .bbl-handle { left: -6px; }
++.bbl:hover > .bbl-handle,
++.bbl-handle:focus-visible {
++  opacity: 1;
++  background-color: color-mix(in srgb, var(--color-accent) 18%, transparent);
++}
++.bbl-run > .bbl-handle { left: -6px; }
++@media (hover: none) {
++  .bbl-handle { display: none; }
++}
++
+ html,
+ body,
+ #root {

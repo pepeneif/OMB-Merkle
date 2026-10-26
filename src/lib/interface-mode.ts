@@ -1,7 +1,5 @@
 import { useSyncExternalStore } from "react";
 
-import { hasPriorRun } from "./prior-run";
-
 export const ADVANCED_MODE_KEY = "omb-advanced-mode";
 
 let sessionChoice: boolean | undefined;
@@ -22,7 +20,10 @@ export function readAdvancedMode(): boolean {
     const stored = store?.getItem(ADVANCED_MODE_KEY);
     if (stored === "1") return true;
     if (stored === "0") return false;
-    return hasPriorRun(store);
+    // Personalizacion Manager: sin eleccion guardada, este build nace en
+    // Advanced (upstream nacia en Simple salvo instalacion previa). Una
+    // eleccion explicita del usuario (0/1) sigue mandando.
+    return true;
   } catch {
     return false;
   }

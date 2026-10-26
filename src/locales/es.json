@@ -3585,6 +3585,7 @@
   "routines.results.back": "Volver a los resultados",
   "routines.results.showReport": "Mostrar el informe",
   "routines.executionDetails": "Detalles de la ejecución · {name}",
+  "routines.dismissSignal": "Eliminar señal",
   "routines.logsFor": "Registros de ejecución de {name}",
   "routines.logsHint": "Ejecuciones guardadas recientes de todos tus bots. Abre una ejecución para ver su resultado, su error y su hilo de ejecución.",
   "routines.markAllSeen": "Marcar todo como leído",
