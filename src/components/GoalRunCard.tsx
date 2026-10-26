@@ -75,7 +75,7 @@ export function GoalRunCard({ message, solo = false, onStop }: { message: Messag
   return (
     <section
       aria-label={`Goal run: ${copy.label}`}
-      className={cn("w-full max-w-[680px] rounded-2xl border bg-card px-3.5 py-3 shadow-sm", copy.border)}
+      className={cn("bbl bbl-run w-full rounded-2xl border bg-card px-3.5 py-3 shadow-sm", copy.border)}
     >
       <div className="flex items-start gap-3">
         <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl bg-inset">

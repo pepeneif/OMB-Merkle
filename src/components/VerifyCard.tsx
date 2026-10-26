@@ -4,6 +4,7 @@ import { useState } from "react";
 import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
 import { runSummary, type RunSkill, type RunStep } from "@/lib/verify-steps";
+import { BubbleResizeHandle } from "./BubbleResizeHandle";
 
 function StatusIcon({ status }: { status: RunStep["status"] }) {
   const className = "size-4 shrink-0";
@@ -42,7 +43,7 @@ export function VerifyCard({
   return (
     <section
       aria-label={t("chat.verify.aria")}
-      className="pointer-events-auto w-[22rem] max-w-full rounded-2xl border border-hairline/40 bg-raised/95 text-ink shadow-lg backdrop-blur-sm"
+      className="bbl bbl-run pointer-events-auto rounded-2xl border border-hairline/40 bg-raised/95 text-ink shadow-lg backdrop-blur-sm"
     >
       <div className="flex items-center gap-2 px-3 py-2">
         <ListChecks size={14} className="shrink-0 text-accent" aria-hidden="true" />
@@ -105,6 +106,7 @@ export function VerifyCard({
           )}
         </>
       )}
+      <BubbleResizeHandle kind="run" className="bbl-handle" />
     </section>
   );
 }

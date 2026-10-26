@@ -78,18 +78,16 @@ describe("the header's right side", () => {
 
   it("keeps the model picker and the bot's computer in view in Simple mode, with ⋯ left to the bot panel", () => {
     fixture.advanced = false;
-    try {
-      const { markup, controls } = header();
-      expect(controls).toContain("data-test-model-control");
-      expect(fixture.model).toMatchObject({ threadId: "selected" });
-      const computer = controls.match(/<button[^>]*data-tour="computer"[^>]*>/)?.[0] ?? "";
-      expect(computer.split(" ")).toEqual(expect.arrayContaining(["rounded-full", "size-8"]));
-      expect(markup).not.toContain('data-testid="chat-more"');
-      expect(fixture.menus.find((menu) => menu.ariaLabel === "More")).toBeUndefined();
-      expect(markup).toContain("data-chathead-pill");
-    } finally {
-      fixture.advanced = true;
-    }
+    const { markup, controls } = header();
+    expect(markup).not.toContain("data-test-model-control");
+    expect(fixture.model).toBeNull();
+    expect(markup).not.toContain('data-tour="computer"');
+    expect(markup).not.toContain('data-testid="chat-more"');
+    expect(fixture.menus.find((menu) => menu.ariaLabel === "More")).toBeUndefined();
+    // Personalizacion Manager (0010): find and usage live in the header in both modes.
+    expect(controls).toContain("data-header-find");
+    expect(markup).not.toContain("data-chathead-pill");
+    fixture.advanced = true;
   });
 
   it("keeps the computer and ⋯ in a remote client's Simple header, whose settings panel has no room for them", () => {
@@ -127,6 +125,9 @@ describe("the header's right side", () => {
   it("keeps Stop in the Advanced header while a turn runs", () => {
     const { controls } = header({ ...bot, busy: true, tasks: (bot.tasks ?? []).map((task) => ({ ...task, busy: true })) });
     expect(controls).toContain('title="Stop this turn"');
+    // Stop plus the header's find button; the bot carries no usage so no chip.
+    expect(controls.match(/<button/g)).toHaveLength(2);
+    fixture.advanced = true;
   });
 
   it("leaves Advanced mode's model, computer and ⋯ exactly as they were, the inspector unlocked", () => {
@@ -147,6 +148,14 @@ describe("the Simple header", () => {
   it("is one pill: the avatar and name, with a dot for another busy conversation and no title, role or way back", () => {
     const busyElsewhere: Bot = { ...bot, title: "Research", mainThreadId: "other", tasks: [...bot.tasks!, { threadId: "other", title: "Other", createdAt: 0, busy: true, activity: "working" }] };
     fixture.advanced = false;
+    const simple = renderToStaticMarkup(createElement(ChatView, { bot: busyElsewhere }));
+    const identity = simple.slice(simple.indexOf("data-chathead-identity"), simple.indexOf("data-chathead-controls"));
+    // Simple mode keeps the Bot / Conversation title; Advanced swaps in the thread picker.
+    expect(identity).toContain("data-chathead-conversation");
+    expect(identity).toMatch(/data-chathead-conversation[^>]*><span dir="auto" class="truncate">Selected<\/span>/);
+    expect(simple).not.toContain("data-background-activity");
+    expect(simple).not.toContain("data-chathead-back");
+    window.ogb = { remoteClient: { active: true } } as NonNullable<Window["ogb"]>;
     try {
       const simple = renderToStaticMarkup(createElement(ChatView, { bot: busyElsewhere }));
       const identity = simple.slice(simple.indexOf("data-chathead-identity"), simple.indexOf("data-chathead-controls"));
@@ -193,31 +202,21 @@ describe("the Simple header", () => {
 });
 
 describe("header name", () => {
-  it("renames only from the bot's settings in Simple mode: no pencil, and the whole pill opens them", () => {
-    fixture.advanced = false;
-    const markup = renderToStaticMarkup(createElement(ChatView, { bot }));
-    expect(markup).not.toContain('aria-label="Rename Pepper"');
-    const pill = markup.match(/<button[^>]*data-chathead-pill="true"[^>]*>([\s\S]*?)<\/button>/);
-    expect(pill?.[0]).toContain('aria-label="Open Pepper&#x27;s profile"');
-    expect(pill?.[1]).toContain(">Pepper</span>");
-    expect(pill?.[0]).toContain("rounded-full");
+  it("shows the name with no avatar pill and no rounded border, and keeps the pencil in both modes (personalizacion Manager 0010)", () => {
+    for (const advanced of [true, false]) {
+      fixture.advanced = advanced;
+      const markup = renderToStaticMarkup(createElement(ChatView, { bot }));
+      const identity = markup.slice(markup.indexOf("data-chathead-identity"), markup.indexOf("data-chathead-controls"));
+      expect(markup).not.toContain("data-chathead-pill");
+      expect(identity).not.toContain('aria-label="Open Pepper&#x27;s profile" class="[^"]*rounded-full');
+      expect(identity).toContain("Rename Pepper");
+      expect(identity).toContain(">Pepper<");
+    }
     fixture.advanced = true;
   });
 
-  it("keeps the rename pencil in Advanced mode, inside the same pill as the avatar and name", () => {
-    fixture.advanced = true;
-    const markup = renderToStaticMarkup(createElement(ChatView, { bot }));
-    const start = markup.indexOf('<div data-chathead-pill="true"');
-    expect(start).toBeGreaterThan(-1);
-    const pill = markup.slice(start, markup.indexOf("data-chathead-controls"));
-    expect(pill).toContain('aria-label="Open Pepper&#x27;s profile"');
-    expect(pill).toContain("Rename Pepper");
-  });
-
-  it("shows the bot's role beside the pill in Advanced mode, taking only the room the name leaves, and leaves it to the bot panel in Simple", () => {
-    fixture.advanced = false;
-    expect(renderToStaticMarkup(createElement(ChatView, { bot: { ...bot, title: " Research " } }))).not.toContain("data-chathead-role");
-    for (const advanced of [true]) {
+  it("shows the bot's role beside the pill in both modes, taking only the room the name leaves", () => {
+    for (const advanced of [true, false]) {
       fixture.advanced = advanced;
       const markup = renderToStaticMarkup(createElement(ChatView, { bot: { ...bot, title: " Research " } }));
       const identity = markup.slice(markup.indexOf("data-chathead-identity"), markup.indexOf("data-chathead-controls"));
@@ -272,12 +271,20 @@ describe("header name", () => {
     expect(button(pinned)).toContain('data-testid="computer-button-live"');
   });
 
-  it("centres the bot in the header's middle column, with the controls in the last", () => {
+  it("lays the header out as name + threads + export on the left, controls on the right (personalizacion Manager 0010)", () => {
     const markup = renderToStaticMarkup(createElement(ChatView, { bot }));
     const row = markup.match(/data-chathead-row="true" class="([^"]*)"/)?.[1] ?? "";
-    expect(row).toContain("@min-[30rem]/chathead:grid-cols-[minmax(0,1fr)_minmax(0,auto)_minmax(max-content,1fr)]");
-    expect(markup).toMatch(/data-chathead-identity="true" class="[^"]*@min-\[30rem\]\/chathead:col-start-2[^"]*justify-self-center/);
-    expect(markup).toMatch(/data-chathead-controls="true" class="[^"]*@min-\[30rem\]\/chathead:col-start-3/);
+    expect(row).toContain("flex");
+    expect(row).not.toContain("grid-cols-");
+    const identity = markup.slice(markup.indexOf("data-chathead-identity"), markup.indexOf("data-chathead-controls"));
+    expect(identity).toContain('aria-label="All threads"');
+    expect(identity).toContain("data-header-copy");
+    expect(identity).toContain("data-header-download");
+    expect(identity).not.toContain("data-header-find");
+    const controls = markup.slice(markup.indexOf("data-chathead-controls"), markup.indexOf("data-composer-row"));
+    expect(controls).toContain("data-header-find");
+    expect(controls).not.toContain("data-header-copy");
+    expect(controls).not.toContain("data-header-download");
   });
 });
 
@@ -320,10 +327,12 @@ describe("glass header", () => {
 });
 
 describe("thread control placement", () => {
-  it.each([true, false])("leaves All threads out of the header in both modes (advanced: %s)", (advanced) => {
+  it.each([true, false])("shows the All threads picker in the header in Advanced mode only (advanced: %s)", (advanced) => {
     fixture.advanced = advanced;
     const markup = renderToStaticMarkup(createElement(ChatView, { bot }));
-    expect(markup).not.toContain('aria-label="All threads"');
+    // Personalizacion Manager (0010): el selector de hilos vive en la cabecera
+    // (Advanced); en Simple, el titulo de la conversacion.
+    expect(markup.includes('aria-label="All threads"')).toBe(advanced);
     expect(markup.includes('data-testid="chat-more"')).toBe(advanced);
     fixture.advanced = true;
   });
@@ -582,15 +591,14 @@ describe("thread control placement", () => {
     expect(row[1].split(" ")).toContain("@max-[30rem]/chathead:flex-wrap");
     const identity = /data-chathead-identity="[^"]*" class="([^"]*)"/.exec(markup)!;
     expect(identity[1].split(" ")).toEqual(expect.arrayContaining(["min-w-0", "@max-[30rem]/chathead:basis-full"]));
+    expect(identity[1]).not.toContain("justify-self-center");
     const controls = /data-chathead-controls="[^"]*" class="([^"]*)"/.exec(markup)!;
     expect(controls[1].split(" ")).toEqual(expect.arrayContaining(["shrink-0", "@max-[30rem]/chathead:ml-auto", "@max-[30rem]/chathead:flex-wrap"]));
   });
 
-  it("keeps the Chief of Staff badge on one line instead of stacking a word per line", () => {
+  it("no longer repeats the Chief of Staff badge in the header (personalizacion Manager 0010)", () => {
     const markup = renderToStaticMarkup(createElement(ChatView, { bot: { ...bot, busy: false, chiefOfStaff: true } }));
-    const badge = /<span title="Chief of Staff" class="([^"]*)"><svg[^>]*lucide-crown[^]*?<\/svg> <span class="([^"]*)">Chief of Staff<\/span>/.exec(markup)!;
-    expect(badge[1].split(" ")).toEqual(expect.arrayContaining(["shrink-0", "whitespace-nowrap"]));
-    expect(badge[2].split(" ")).toContain("@max-4xl/chathead:sr-only");
+    expect(markup).not.toContain("lucide-crown");
   });
 
   it("keeps the selected thread's model in the header and permissions inside the composer pill", () => {
