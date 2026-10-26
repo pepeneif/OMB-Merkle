@@ -27,12 +27,12 @@ describe("chat width", () => {
     expect(readChatWidth()).toBe("standard");
   });
 
-  it("sizes the standard width like Grok Bot: a 960px column and bubbles of min(80%, 560px)", () => {
+  it("sizes the standard width wide, with the transcript using most of the window (personalizacion Manager 0010)", () => {
     const body = css.match(/:root\s*\{\s*(--chat-bubble-max[^}]*)\}/)?.[1] ?? "";
-    expect(body).toMatch(/--chat-bubble-max:\s*35rem/);
-    expect(body).toMatch(/--chat-bubble-pct:\s*80%/);
-    expect(body).toMatch(/--chat-card-pct:\s*88%/);
-    expect(body).toMatch(/--chat-column-max:\s*60rem/);
+    expect(body).toMatch(/--chat-bubble-max:\s*56rem/);
+    expect(body).toMatch(/--chat-bubble-pct:\s*92%/);
+    expect(body).toMatch(/--chat-card-pct:\s*94%/);
+    expect(body).toMatch(/--chat-column-max:\s*104rem/);
   });
 
   it("gives every non-default width a stylesheet block that sets the bubble variables", () => {
@@ -60,7 +60,7 @@ describe("chat width", () => {
 
   it("centers the transcript and the composer in one column, in a chat and in a room", () => {
     expect(css).toMatch(/\.chat-column \{[^}]*margin-inline: auto;[^}]*max-width: var\(--chat-column-max\);/);
-    expect(css).toMatch(/\.chat-column-dock \{[^}]*margin-inline: auto;[^}]*max-width: calc\(var\(--chat-column-max\) \+ 2\.5rem\);/);
+    expect(css).toMatch(/\.chat-column-dock \{[^}]*margin-inline: auto;[^}]*max-width: calc\(var\(--chat-column-max\) \+ 1rem\);/);
     for (const f of ["ChatView", "GroupView"]) {
       const source = readFileSync(join(root, "components", `${f}.tsx`), "utf8");
       expect(source, f).toMatch(/className="glass-scroller-content chat-column /);

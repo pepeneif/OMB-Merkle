@@ -7,6 +7,7 @@ import {
 import { bootstrapBrand } from "./lib/brand";
 import { applySkin, readSkin } from "./lib/skins";
 import { applyChatWidth, readChatWidth } from "./lib/chat-width";
+import { applyStoredBubbleWidths } from "./lib/bubble-width";
 import { applyFont, readFont } from "./lib/fonts";
 import { settleAdvancedModeDefault } from "./lib/interface-mode";
 import { BrowserSignInPage } from "./pair/BrowserSignInPage";
@@ -19,6 +20,7 @@ settleAdvancedModeDefault();
 applySkin(readSkin());
 applyFont(readFont());
 applyChatWidth(readChatWidth());
+applyStoredBubbleWidths();
 
 async function chooseRoot(): Promise<React.ReactNode> {
   const home = window.ogb?.home;

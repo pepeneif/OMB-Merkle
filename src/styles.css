@@ -185,23 +185,25 @@
 
 /* Tokens that no utility generates — declared outside `@theme` so Tailwind
    can't tree-shake them away, and so a skin can redefine them freely. */
+/* Personalizacion Manager (0010): la columna del chat usa mas ancho de la
+   ventana y las burbujas ocupan mucho mas (antes 35rem/80%; ahora 56rem/92%). */
 :root {
-  --chat-bubble-max: 35rem;
-  --chat-bubble-pct: 80%;
-  --chat-card-pct: 88%;
-  /* .chat-column: fills a narrow pane, then stops at this width and centers, so wider windows only grow the gutters. */
-  --chat-column-max: 60rem;
-}
-:root[data-chat-width="wide"] {
-  --chat-bubble-max: 64rem;
+  --chat-bubble-max: 56rem;
   --chat-bubble-pct: 92%;
   --chat-card-pct: 94%;
-  --chat-column-max: 80rem;
+  /* .chat-column: fills a narrow pane, then stops at this width and centers, so wider windows only grow the gutters. */
+  --chat-column-max: 104rem;
+}
+:root[data-chat-width="wide"] {
+  --chat-bubble-max: 72rem;
+  --chat-bubble-pct: 96%;
+  --chat-card-pct: 96%;
+  --chat-column-max: 120rem;
 }
 :root[data-chat-width="full"] {
   --chat-bubble-max: 100%;
-  --chat-bubble-pct: 96%;
-  --chat-card-pct: 96%;
+  --chat-bubble-pct: 97%;
+  --chat-card-pct: 97%;
   --chat-column-max: 100%;
 }
 
@@ -1294,8 +1296,55 @@ body {
 }
 .chat-column-dock {
   margin-inline: auto;
-  max-width: calc(var(--chat-column-max) + 2.5rem);
+  /* Personalizacion Manager (0010): el scroller pasa de px-5 a px-2, asi que
+     el dock suma el gutter nuevo (1rem) para que el compositor alinee. */
+  max-width: calc(var(--chat-column-max) + 1rem);
 }
+/* ────────────────────────────────────────────────────────────────────────
+   PERSONALIZACION MANAGER (0010) — ancho de burbujas ajustable por el usuario.
+   Cada burbuja toma su max-width de una variable en :root; el mango de arrastre
+   vive en el borde libre (derecha en las del bot, izquierda en las del usuario y
+   en "This run"). Sin arrastrar, manda el valor por defecto de la hoja.
+   ──────────────────────────────────────────────────────────────────────── */
+.bbl {
+  position: relative;
+}
+.bbl-bot {
+  max-width: min(var(--bubble-bot, var(--chat-bubble-max)), var(--chat-bubble-pct));
+}
+.bbl-user {
+  max-width: min(var(--bubble-user, var(--chat-bubble-max)), var(--chat-bubble-pct));
+}
+.bbl-run {
+  width: min(var(--bubble-run, 45rem), var(--chat-card-pct));
+  max-width: var(--chat-card-pct);
+}
+/* El mango solo existe en escritorio: en tactil no hay hover y chocaria con el
+   scroll y la seleccion de texto. Delgado, mas transparente y con un margen
+   arriba/abajo para no tocar la curvatura de la esquina de la burbuja. */
+.bbl-handle {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  width: 4px;
+  cursor: col-resize;
+  touch-action: none;
+  opacity: 0;
+  border-radius: 9999px;
+  transition: opacity 120ms ease, background-color 120ms ease;
+}
+.bbl-bot > .bbl-handle { right: -7px; }
+.bbl-user > .bbl-handle { left: -7px; }
+.bbl-run > .bbl-handle { left: -7px; }
+.bbl:hover > .bbl-handle,
+.bbl-handle:focus-visible {
+  opacity: 1;
+  background-color: color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+@media (hover: none) {
+  .bbl-handle { display: none; }
+}
+
 @media (prefers-reduced-transparency: reduce) {
   .glass-bar::before {
     background: var(--glass-tint, var(--color-panel));
