@@ -1972,7 +1972,7 @@ export function nextLiveCallLookup(): number {
 export { api, ApiError };
 
 /** Messages per snapshot thread and per scrollback page: the server's own page maximum. */
-export const MESSAGE_PAGE_SIZE = 200;
+export const MESSAGE_PAGE_SIZE = 50;
 
 
 type TrustedApprovalBridge = {

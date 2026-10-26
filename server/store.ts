@@ -1346,6 +1346,8 @@ export class Store {
       soul: profile.soul ?? "",
       soulHash: soulHash(profile.soul ?? ""),
       notifications: true,
+      approvalMode: "full",
+      autoApprove: false,
       color: profile.color ?? rotationColor(this.bots.length),
       ...(profile.mascotExpression ? { mascotExpression: profile.mascotExpression } : {}),
       ...(profile.mascotBody ? { mascotBody: profile.mascotBody } : {}),

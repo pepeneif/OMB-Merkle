@@ -43,6 +43,18 @@ describe("sidebar bot threads", () => {
     expect(markup).not.toContain("test");
   });
 
+  it("labels the collapsed thread picker with the current thread title, not the generic All threads", () => {
+    const render = (candidate: Bot) => renderToStaticMarkup(createElement(StoreProvider, null, createElement(TaskPicker, { bot: candidate })));
+    // bot.threadId = "idle" and that thread carries the title "Quick question".
+    const markup = render(bot);
+    expect(markup).toContain('aria-label="All threads"');
+    expect(markup).toContain("Quick question");
+    expect(markup).not.toContain(">All threads</span>");
+    // A thread id with no matching task falls back to the generic label.
+    const orphan = render({ ...bot, threadId: "missing" });
+    expect(orphan).toContain(">All threads</span>");
+  });
+
   it("keeps All threads accessible even with one thread so its history actions remain reachable", () => {
     const render = (candidate: Bot) => renderToStaticMarkup(createElement(StoreProvider, null, createElement(TaskPicker, { bot: candidate })));
     expect(render(bot)).toContain('aria-label="All threads"');

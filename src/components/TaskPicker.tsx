@@ -230,7 +230,7 @@ function ConversationTaskPicker({
           COMPACT_BUBBLE,
         )}
       >
-        <span className="truncate @max-4xl/chathead:hidden">{t("task.switch")}</span>
+        <span dir="auto" className="truncate @max-4xl/chathead:hidden">{current?.title ?? t("task.switch")}</span>
         <span className="shrink-0 tabular-nums opacity-60 @max-4xl/chathead:opacity-100">{tasks.length}</span>
         {workingElsewhere > 0 && (
           <span

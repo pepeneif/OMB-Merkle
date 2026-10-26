@@ -56,6 +56,7 @@ vi.mock("./ApprovalModeSelector", () => ({ ApprovalModeSelector: (props: Compone
 
 const { ChatView, ErrorRow, FailedTurnRow, claudeUpdateTarget } = await import("./ChatView");
 const { NewConversationInstead } = await import("./NewConversationInstead");
+const { initialState } = await import("@/state/store");
 const { activityPreview } = await import("@/lib/failed-turn");
 afterAll(() => vi.unstubAllGlobals());
 
@@ -706,5 +707,46 @@ describe("the way back to the bot's own conversation", () => {
     expect(header(true, visiting)).not.toContain("data-chathead-back");
     expect(header(false, { ...visiting, threadId: "main" })).not.toContain("data-chathead-back");
     expect(header(false, { ...visiting, mainThreadId: "unknown" })).not.toContain("data-chathead-back");
+  });
+});
+
+// Personalizacion Manager (parche 0009): la barra "Run details" del hilo solo
+// se pinta cuando la ejecucion de rutina MAS RECIENTE de ese hilo salio mal
+// (failed/missed) y nadie la ha reconocido. Antes se pintaba por tener
+// cualquier ejecucion guardada, aunque hubiera salido bien.
+describe("routine execution banner (0009: solo si la ultima fallo)", () => {
+  const bannerBot = { ...bot, threadId: "selected", busy: false };
+  const run = (over: Record<string, unknown>) => ({
+    id: "run", routineId: "routine", routineName: "Kamino horaria", target: "bot", botId: "bot",
+    runOn: "maus", scheduledFor: 100, status: "completed", manual: false, createdAt: 100,
+    threadId: "selected", ...over,
+  });
+  const bannerFor = (runs: unknown[]) => {
+    Object.assign(initialState, { bots: [bannerBot], groups: [], routineRuns: runs });
+    try {
+      const markup = renderToStaticMarkup(createElement(ChatView, { bot: bannerBot as Bot }));
+      return /Run details[^<]*/.exec(markup)?.[0] ?? null;
+    } finally {
+      Object.assign(initialState, { bots: [], groups: [], routineRuns: [] });
+    }
+  };
+
+  it("no pinta nada cuando la ultima ejecucion salio bien", () => {
+    expect(bannerFor([run({ status: "completed" })])).toBeNull();
+  });
+
+  it("no pinta nada cuando la ultima fallo pero ya la reconocimos", () => {
+    expect(bannerFor([run({ status: "failed", seenAt: 123 })])).toBeNull();
+  });
+
+  it("si pinta la senal cuando la ultima fallo y sigue sin reconocer", () => {
+    expect(bannerFor([run({ status: "failed" })])).toContain("Kamino horaria");
+  });
+
+  it("mira la mas reciente: una vieja fallida no revive la senal", () => {
+    expect(bannerFor([
+      run({ status: "failed", scheduledFor: 50 }),
+      run({ status: "completed", scheduledFor: 200 }),
+    ])).toBeNull();
   });
 });

@@ -36,13 +36,13 @@ afterEach(() => {
 });
 
 describe("interface mode", () => {
-  it("defaults a fresh install to Simple and stores that once", async () => {
+  it("defaults a fresh install to Advanced (personalizacion Manager) and stores that once", async () => {
     const { readAdvancedMode, settleAdvancedModeDefault, ADVANCED_MODE_KEY } = await fresh();
-    expect(readAdvancedMode()).toBe(false);
+    expect(readAdvancedMode()).toBe(true);
     settleAdvancedModeDefault();
     local.setItem("omb-skin", "midnight");
-    expect(local.getItem(ADVANCED_MODE_KEY)).toBe("0");
-    expect((await fresh()).readAdvancedMode()).toBe(false);
+    expect(local.getItem(ADVANCED_MODE_KEY)).toBe("1");
+    expect((await fresh()).readAdvancedMode()).toBe(true);
   });
 
   it("defaults an existing install to Advanced so an update hides nothing", async () => {
