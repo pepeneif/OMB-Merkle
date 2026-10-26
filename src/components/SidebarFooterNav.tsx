@@ -1,4 +1,4 @@
-import { FolderOpen, Puzzle, UsersRound, Zap } from "lucide-react";
+import { CalendarDays, FolderOpen, Network, Puzzle, Zap } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { useAppTriggers } from "@/lib/app-triggers";
@@ -107,10 +107,10 @@ export function SidebarBottomButtons() {
           tourId="nav-automations"
           iconsOnly
           rail
-          active={state.activeView === "routines"}
+          active={state.activeView === "routines" && state.routinesFocus?.scope !== "triggers"}
           attention={automationsNeedYou}
-          icon={(active) => <Zap size={18} className={tone(active)} />}
-          onClick={() => dispatch({ type: "showRoutines", view: "list" })}
+          icon={(active) => <CalendarDays size={18} className={tone(active)} />}
+          onClick={() => dispatch({ type: "showRoutines", view: "list", scope: "schedules" })}
         />
         <NavRow
           id="team-map"
@@ -118,7 +118,7 @@ export function SidebarBottomButtons() {
           iconsOnly
           rail
           active={state.activeView === "team-map"}
-          icon={(active) => <UsersRound size={18} className={tone(active)} />}
+          icon={(active) => <Network size={18} className={tone(active)} />}
           onClick={() => dispatch({ type: "showTeamMap" })}
         />
       </>}
@@ -153,10 +153,10 @@ export function SidebarFooterNav({
     tourId="nav-automations"
     iconsOnly={iconsOnly || toolbar}
     rail={rail}
-    active={state.activeView === "routines"}
+    active={state.activeView === "routines" && state.routinesFocus?.scope !== "triggers"}
     attention={automationsNeedYou}
-    icon={(active) => <Zap size={iconSize} className={tone(active)} />}
-    onClick={() => dispatch({ type: "showRoutines", view: "list" })}
+    icon={(active) => <CalendarDays size={iconSize} className={tone(active)} />}
+    onClick={() => dispatch({ type: "showRoutines", view: "list", scope: "schedules" })}
   />;
   const filesRow = useCloudFilesReady() && <NavRow
     id="files"
@@ -173,6 +173,16 @@ export function SidebarFooterNav({
   const rows = (
     <>
       {automationsRow}
+      <NavRow
+        id="triggers"
+        label={t("sidebar.nav.triggers")}
+        tourId="nav-triggers"
+        iconsOnly={iconsOnly || toolbar}
+        rail={rail}
+        active={state.activeView === "routines" && state.routinesFocus?.scope === "triggers"}
+        icon={(active) => <Zap size={iconSize} className={tone(active)} />}
+        onClick={() => dispatch({ type: "showRoutines", view: "list", scope: "triggers" })}
+      />
       {iconsOnly && <NavRow
         id="apps"
         label={t("sidebar.nav.apps")}
@@ -191,7 +201,7 @@ export function SidebarFooterNav({
           iconsOnly={iconsOnly || toolbar}
           rail={rail}
           active={state.activeView === "team-map"}
-          icon={(active) => <UsersRound size={iconSize} className={tone(active)} />}
+          icon={(active) => <Network size={iconSize} className={tone(active)} />}
           onClick={() => dispatch({ type: "showTeamMap" })}
         />
       )}

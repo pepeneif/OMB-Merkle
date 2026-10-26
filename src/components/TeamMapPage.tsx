@@ -287,7 +287,7 @@ export function TeamMapPage() {
   const pendingMoveRef = useRef(pendingMove);
   pendingMoveRef.current = pendingMove;
   useEffect(() => () => pendingMoveRef.current?.resolve(false), []);
-  const bots = useMemo(() => state.bots.filter((bot) => !bot.hidden), [state.bots]);
+  const bots = useMemo(() => state.bots.filter((bot) => !bot.hidden && !bot.sidebarHidden), [state.bots]);
   const sections = useMemo(() => {
     const names = [...new Set([...(state.sections ?? []), ...state.groups.flatMap((group) => group.section ? [group.section] : [])])];
     const order = (key: string) => key === "" ? -1 : names.includes(key) ? names.indexOf(key) : names.length;

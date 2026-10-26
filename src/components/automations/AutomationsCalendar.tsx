@@ -30,7 +30,7 @@ export function AutomationsCalendar({ botFilter, selectedAutomationId, onOpenAut
   const [editor, setEditor] = useState<EventSeed | null>(null);
   const [selected, setSelected] = useState<CalendarEventItem | null>(null);
   const [error, setError] = useState("");
-  const visibleBots = state.bots.filter((bot) => !bot.hidden);
+  const visibleBots = state.bots.filter((bot) => !bot.hidden && !bot.sidebarHidden);
   const rangeStart = days === 7 ? startOfWeek(anchor) : startOfDay(anchor);
   const rangeEnd = addDays(rangeStart, days);
   const markers = resetMarkers(useEngineLimits(), rangeStart, rangeEnd);
@@ -137,14 +137,14 @@ export function AutomationsCalendar({ botFilter, selectedAutomationId, onOpenAut
       </div>
       <div className="relative flex min-h-0 flex-1">
         {!liveSelected && <div className="hidden shrink-0 @min-[1040px]/routines:block"><CalendarSidebar bots={visibleBots} anchor={anchor} onSelectDate={(at) => setAnchor(startOfDay(at))} /></div>}
-        <CalendarGrid anchor={rangeStart} days={days} items={items} bots={state.bots} groups={state.groups} selectedId={selectedId}
+        <CalendarGrid anchor={rangeStart} days={days} items={items} bots={visibleBots} groups={state.groups} selectedId={selectedId}
           onOpen={openItem}
           onCreate={(seed) => { setSelected(null); setQuick(seed); }}
           onMove={(item, at) => void moveEvent(item, at)} onResize={(item, duration) => void resizeEvent(item, duration)}
           markers={markers} onDropOnReset={(drop, marker) => void dropOnReset(drop, marker)} />
         {liveSelected && (
           <div className="absolute inset-y-0 right-0 z-30 flex shadow-2xl @min-[760px]/routines:static @min-[760px]/routines:shadow-none">
-            <EventDetails key={`${liveSelected.kind}:${liveSelected.id}`} item={liveSelected} bots={state.bots} onClose={() => setSelected(null)} onEdit={editSelected} onOpenRun={openRun}
+            <EventDetails key={`${liveSelected.kind}:${liveSelected.id}`} item={liveSelected} bots={visibleBots} onClose={() => setSelected(null)} onEdit={editSelected} onOpenRun={openRun}
               onCallChanged={(id) => { if (id) setCalls((current) => current.filter((call) => call.id !== id)); else void loadCalls(); }} onOpenRoom={onOpenRoom} />
           </div>
         )}

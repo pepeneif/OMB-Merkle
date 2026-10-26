@@ -41,26 +41,20 @@ beforeEach(() => {
   vi.stubGlobal("window", {});
 });
 
-describe("bot-colored user bubbles", () => {
-  it("keeps the skin bubble when the setting is off", () => {
+describe("bubbles stay homogeneous", () => {
+  it("keeps the skin bubble for the person's messages, never a bot-colored gradient", () => {
     const html = renderToStaticMarkup(createElement(ChatView, { bot }));
     expect(html).toContain("bg-bubble-user");
     expect(html).not.toContain("user-bubble-colored");
     expect(html).toContain("hello from me");
   });
 
-  it("paints the person's bubble with a gradient of the bot and readable text", () => {
+  it("paints the person's bubble with the skin colour even when the old setting was on", () => {
     fixture.colorMine = true;
     const tone = userBubbleTone("yellow");
     const html = renderToStaticMarkup(createElement(ChatView, { bot }));
-    expect(html).toContain("user-bubble-colored");
-    expect(html).toContain(`background-color:${tone.background}`);
-    expect(html).toContain(`background-image:${tone.gradient}`);
-    expect(html).toContain(`--color-ink:${tone.ink}`);
+    expect(html).not.toContain("user-bubble-colored");
+    expect(html).not.toContain(`background-image:${tone.gradient}`);
     expect(html).toContain("hello from me");
-    const mine = html.indexOf("user-bubble-colored");
-    const reply = html.indexOf("hello back");
-    expect(mine).toBeGreaterThan(-1);
-    expect(html.slice(reply - 80, reply)).not.toContain(tone.background);
   });
 });

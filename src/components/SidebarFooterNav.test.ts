@@ -51,9 +51,12 @@ describe("sidebar footer places", () => {
     expect(order.every((index) => index >= 0)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
     expect(html).toContain(">Automations</span>");
+    expect(html).toContain(">Triggers</span>");
     expect(html).not.toContain('data-sidebar-nav="routines"');
-    expect(html).not.toContain('data-sidebar-nav="triggers"');
     expect(html).not.toContain('data-sidebar-nav="apps"');
+    const withTriggers = ["automations", "triggers", "team-map"].map((id) => html.indexOf(`data-sidebar-nav="${id}"`));
+    expect(withTriggers.every((index) => index >= 0)).toBe(true);
+    expect(withTriggers).toEqual([...withTriggers].sort((a, b) => a - b));
   });
 
   it.each(["comfortable", "compact"] as const)("leaves no places in Simple mode's sidebar while Files is off: Automations and Team map are in the bottom bar (%s)", (density) => {
@@ -73,9 +76,21 @@ describe("sidebar footer places", () => {
     fixture.advanced = true;
     const { nodes: tree } = render("comfortable");
     (tree.find((node) => node.props.id === "automations" && typeof node.props.onClick === "function")!.props.onClick as () => void)();
-    expect(fixture.dispatch).toHaveBeenLastCalledWith({ type: "showRoutines", view: "list" });
+    expect(fixture.dispatch).toHaveBeenLastCalledWith({ type: "showRoutines", view: "list", scope: "schedules" });
     fixture.state.activeView = "routines";
+    fixture.state.routinesFocus = { scope: "schedules", nonce: 0 };
     expect(render("comfortable").html).toMatch(/data-sidebar-nav="automations"[^>]*aria-current="page"/);
+  });
+
+  it("opens the Triggers page (triggers scope) through the store and marks it current while open", () => {
+    fixture.advanced = true;
+    const { nodes: tree } = render("comfortable");
+    const row = tree.find((node) => node.props.id === "triggers" && typeof node.props.onClick === "function")!;
+    (row.props.onClick as () => void)();
+    expect(fixture.dispatch).toHaveBeenLastCalledWith({ type: "showRoutines", view: "list", scope: "triggers" });
+    fixture.state.activeView = "routines";
+    fixture.state.routinesFocus = { scope: "triggers", nonce: 0 };
+    expect(render("comfortable").html).toMatch(/data-sidebar-nav="triggers"[^>]*aria-current="page"/);
   });
 
   it("keeps the guided tour's anchors on the rows", () => {
@@ -203,7 +218,7 @@ describe("the bottom bar beside the profile", () => {
 
   it("opens Automations and Team map, marks the open one, and carries the failed-run dot on Automations", () => {
     press(renderBottom().nodes, "automations");
-    expect(fixture.dispatch).toHaveBeenLastCalledWith({ type: "showRoutines", view: "list" });
+    expect(fixture.dispatch).toHaveBeenLastCalledWith({ type: "showRoutines", view: "list", scope: "schedules" });
     press(renderBottom().nodes, "team-map");
     expect(fixture.dispatch).toHaveBeenLastCalledWith({ type: "showTeamMap" });
     fixture.state.activeView = "team-map";
@@ -265,9 +280,9 @@ describe("toolbar tools layout", () => {
     expect(render("comfortable", { toolsLayout: "toolbar" }).html).not.toContain('data-testid="routines-attention"');
   });
 
-  it("toolbar applies to Advanced mode's two places; Simple mode keeps them in the bottom bar instead", () => {
+  it("toolbar applies to Advanced mode's places; Simple mode keeps them in the bottom bar instead", () => {
     fixture.advanced = true;
-    expect(render("comfortable", { toolsLayout: "toolbar" }).html.match(/data-sidebar-nav="/g)).toHaveLength(2);
+    expect(render("comfortable", { toolsLayout: "toolbar" }).html.match(/data-sidebar-nav="/g)).toHaveLength(3);
     fixture.advanced = false;
     expect(render("comfortable", { toolsLayout: "toolbar" }).html).toBe("");
   });
