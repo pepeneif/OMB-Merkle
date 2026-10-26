@@ -392,7 +392,7 @@ export function SidebarProfileMenu({ iconOnly = false, rail = false }: { iconOnl
             ref={triggerRef}
             className={cn(
               "relative flex items-center justify-center rounded-xl transition-colors",
-              rail ? "size-10" : "size-[46px]",
+              rail ? "size-10" : "size-11",
               open ? "bg-raised" : "hover:bg-raised/50",
             )}
           >

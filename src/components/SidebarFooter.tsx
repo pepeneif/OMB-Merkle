@@ -11,7 +11,7 @@ import { UpdateIndicator } from "./UpdateIndicator";
 export function SidebarFooter({ density, toolsCollapsed, onToggleTools }: { density: SidebarDensity; toolsCollapsed: boolean; onToggleTools?: () => void }) {
   const { dispatch } = useStore();
   return (
-    <div className={cn("pb-3 pt-2", density === "icons" ? "flex flex-col items-center gap-1 px-2" : "px-3")}>
+    <div className={cn("pb-3 pt-2", density === "icons" ? "flex flex-col gap-0.5 px-2" : "px-3")}>
       <SidebarFooterNav density={density} collapsed={toolsCollapsed} onToggleCollapsed={onToggleTools} />
       {density === "icons" ? (
         <>
