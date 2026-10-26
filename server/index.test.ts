@@ -194,8 +194,10 @@ const managedBoatNameForFixture = (botId: string): string => {
 };
 
 const managedVpsNameForFixture = (botId: string): string => {
+  // vps-computer.ts scopes the name hash to the server installation, whose HOME differs from this process's.
+  const environmentId = readFileSync(join(home, ".openmausbot", "environment-id"), "utf8").trim();
   const botPrefix = botId.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 12) || "bot";
-  const botHash = createHash("sha256").update(botId).digest("hex").slice(0, 12);
+  const botHash = createHash("sha256").update(environmentId).update("\n").update(botId).digest("hex").slice(0, 12);
   return `openmausbot-vps-${botPrefix}-${botHash}`;
 };
 

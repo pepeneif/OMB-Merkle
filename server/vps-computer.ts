@@ -175,7 +175,9 @@ function containerNamePart(botId: string): string {
 }
 
 export function vpsContainerName(botId: string): string {
-  const hash = createHash("sha256").update(botId).digest("hex").slice(0, 12);
+  // Scoped to this installation: a cloned data dir (same bot ids) sharing the same Docker daemon
+  // must never resolve to — or be able to remove — another installation's computer.
+  const hash = createHash("sha256").update(vpsEnvironmentId()).update("\n").update(botId).digest("hex").slice(0, 12);
   return `${VPS_CONTAINER_PREFIX}-${containerNamePart(botId)}-${hash}`;
 }
 
