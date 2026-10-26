@@ -68,6 +68,8 @@ import { BotProjectDialog, FolderActions, FolderIcon, navigateThreadMenu } from 
 import { NewTaskFolderDialog } from "./NewTaskFolderDialog";
 import { useOwnerOrAdmin } from "@/lib/use-owner-or-admin";
 import { draggedFolder, FOLDER_DRAG_TYPE, moveFolder, placeFolder } from "@/lib/folder-order";
+/** Alt+drag moves a bot within its section; the new order is the fleet order, so it is saved on the server. */
+const BOT_DRAG_TYPE = "application/x-openmausbot-bot";
 import { botUnreadThreadIds, folderUnreadThreadIds, markBotRead, markFolderRead } from "@/lib/folder-read";
 import { HelperThreadGroup, orderedThreadList, partitionHelperThreads, SidebarThreadRow, stampClock, threadRecency, threadRowActions, useRelativeNow, useRevealedThreadRow, useSnoozeExpiry, visibleSidebarThreads } from "./SidebarThreadRow";
 import {
@@ -93,6 +95,7 @@ import {
   PINNED_THREADS_SECTION_ID,
   SIMPLE_FIXED_SECTION_IDS,
   TOOLS_SECTION_ID,
+  botRosterGroups,
   keepFixedSectionSlots,
   mergeSectionOrder,
   moveSection,
@@ -946,13 +949,24 @@ export interface BotRowProps {
   query: string;
   dispatch: Dispatch<Action>;
   onMenu: (menu: MenuState) => void;
+  /** Alt+drag reordering of the bot roster (the fleet order lives on the server, PUT /api/bots/order). */
+  rosterDrag?: {
+    onDragStart: (event: React.DragEvent<HTMLElement>) => void;
+    onDragOver: (event: React.DragEvent<HTMLElement>) => void;
+    onDrop: (event: React.DragEvent<HTMLElement>) => void;
+    onDragEnd: () => void;
+    /** True only while Alt is held, so a plain drag stays a no-op. */
+    enabled: boolean;
+    dragging: boolean;
+    place: "before" | "after" | null;
+  };
 }
 
 export function botRowProps(
   state: AppState,
   dispatch: Dispatch<Action>,
   bot: Bot,
-  layout: Pick<BotRowProps, "density" | "quiet" | "query" | "onMenu">,
+  layout: Pick<BotRowProps, "density" | "quiet" | "query" | "onMenu"> & { rosterDrag?: BotRowProps["rosterDrag"] },
 ): BotRowProps {
   const selected = state.activeView === "chat" && state.selectedId === bot.id;
   const reveal = state.revealThread;
@@ -979,7 +993,7 @@ function useVisibleMessages(bot: Bot): Message[] {
 
 export const BotListItem = memo(function BotListItem(props: BotRowProps) {
   const advanced = useAdvancedMode();
-  const { bot, selected, deleting, mascotMotion, reveal, pendingQueued, instances, liveCall, density, quiet, query, dispatch, onMenu } = props;
+  const { bot, selected, deleting, mascotMotion, reveal, pendingQueued, instances, liveCall, density, quiet, query, dispatch, onMenu, rosterDrag } = props;
   const showThreads = useShowThreads();
   const liveMedia = useLiveMedia();
   const remoteClient = typeof window !== "undefined" && window.ogb?.remoteClient?.active === true;
@@ -999,7 +1013,7 @@ export const BotListItem = memo(function BotListItem(props: BotRowProps) {
   const title = bot.title.trim();
   const details = [title, bot.chiefOfStaff ? t("sidebar.bot.chiefOfStaff") : ""].filter(Boolean);
   const rowClass = cn(
-    "flex w-full items-center rounded-xl text-left outline-none transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-accent/60",
+    "relative flex w-full items-center rounded-xl text-left outline-none transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-accent/60",
     iconOnly
       ? railTile ? "h-[52px] justify-center" : "justify-center px-1 py-1.5"
       : density === "compact"
@@ -1007,6 +1021,9 @@ export const BotListItem = memo(function BotListItem(props: BotRowProps) {
         : simpleRow ? cn("gap-2.5 py-2 pl-2", selected ? "pr-9" : "pr-3 group-hover:pr-9 group-focus-within:pr-9 max-md:pr-9 touch:pr-9")
         : cn(showThreads ? "gap-2 py-2" : "gap-3 py-2", showThreads ? "pl-6 pr-9 group-hover:pr-[5.75rem] group-focus-within:pr-[5.75rem] max-md:pr-[5.75rem] touch:pr-[5.75rem]" : "pl-2.5 pr-9"),
     selected ? "bg-raised shadow-[0_1px_2px_rgb(0_0_0/0.10)]" : "hover:bg-raised/50",
+    rosterDrag?.dragging && "opacity-40",
+    rosterDrag?.place === "before" && "before:absolute before:-top-px before:left-2 before:right-2 before:h-0.5 before:rounded-full before:bg-accent",
+    rosterDrag?.place === "after" && "after:absolute after:-bottom-px after:left-2 after:right-2 after:h-0.5 after:rounded-full after:bg-accent",
   );
   const activityTasks = sidebarBotActivityTasks(bot, pendingQueued);
   const waiting = bot.activity === "waiting-on-you" || activityTasks.some((task) => task.activity === "waiting-on-you");
@@ -1150,6 +1167,12 @@ export const BotListItem = memo(function BotListItem(props: BotRowProps) {
         aria-busy={deleting || undefined}
         aria-current={selected && !expanded && !renaming ? "page" : undefined}
         data-sidebar-bot-row={bot.id}
+        data-sidebar-bot-drag={rosterDrag?.place ?? undefined}
+        draggable={rosterDrag?.enabled || undefined}
+        onDragStart={rosterDrag?.onDragStart}
+        onDragOver={rosterDrag?.onDragOver}
+        onDrop={rosterDrag?.onDrop}
+        onDragEnd={rosterDrag?.onDragEnd}
         onClick={onSelect}
         onKeyDown={(event) => {
           if (renaming) return;
@@ -1303,10 +1326,34 @@ export function Sidebar({ open, onClose, collapseToIcons = false }: {
     from: string | null;
     over: { id: string; place: SectionDropPlace } | null;
   }>({ from: null, over: null });
+  const [draggingBotId, setDraggingBotId] = useState<string | null>(null);
+  const [botDropTarget, setBotDropTarget] = useState<{ id: string; place: SectionDropPlace } | null>(null);
+  const [altHeld, setAltHeld] = useState(false);
+  const botDragRef = useRef<{
+    from: string | null;
+    over: { id: string; place: SectionDropPlace } | null;
+  }>({ from: null, over: null });
 
   useEffect(() => {
     if (density !== "icons") setLastExpandedDensity(density);
     else setQuery("");
+  }, [density]);
+
+  // Reordering a bot is Alt+drag, like a section: a plain drag must stay a no-op so a row can't be
+  // swept out of place by accident, and the fleet order only changes on purpose.
+  useEffect(() => {
+    if (density === "icons") { setAltHeld(false); return; }
+    const down = (event: KeyboardEvent) => { if (event.key === "Alt") setAltHeld(true); };
+    const up = (event: KeyboardEvent) => { if (event.key === "Alt") setAltHeld(false); };
+    const blur = () => setAltHeld(false);
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    window.addEventListener("blur", blur);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+      window.removeEventListener("blur", blur);
+    };
   }, [density]);
 
   const toggleCollapsed = () => {
@@ -1370,7 +1417,6 @@ export function Sidebar({ open, onClose, collapseToIcons = false }: {
   };
 
   const macInset = capabilities.windowChrome === "mac-inset";
-  const browser = capabilities.host.label === "Browser";
   const draggableChrome = macInset || capabilities.windowChrome === "win-caption";
   // SAFETY: Electron's -webkit-app-region is not in React's CSSProperties type; the renderer accepts it as an inline
   // style.
@@ -1493,11 +1539,94 @@ export function Sidebar({ open, onClose, collapseToIcons = false }: {
     if (from && over) reorderSections(from, placeSection(sectionIds, from, over.id, over.place));
     resetSectionDrag();
   };
+
+  // A bot is reordered inside its own roster group (Pinned, a department, or the loose bots):
+  // the fleet order the server keeps is one list, so only the group's ids are sent.
+  const botDragGroups = (() => {
+    return botRosterGroups({
+      pinned: pinnedBots.map((bot) => bot.id),
+      sections: sectionNames.map((name) => ({
+        chiefs: sectionChiefs.filter((bot) => bot.section === name).map((bot) => bot.id),
+        members: sectionedBots.filter((bot) => bot.section === name).map((bot) => bot.id),
+      })),
+      unsectioned: unsectionedBots.map((bot) => bot.id),
+    });
+  })();
+
+  const resetBotDrag = () => {
+    botDragRef.current = { from: null, over: null };
+    setDraggingBotId(null);
+    setBotDropTarget(null);
+  };
+
+  const onBotDragStart = (bot: Bot, event: React.DragEvent<HTMLElement>) => {
+    const group = botDragGroups.get(bot.id);
+    if (!layoutInteractive || !event.altKey || !group) return;
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData(BOT_DRAG_TYPE, bot.id);
+    event.dataTransfer.setData("text/plain", bot.id);
+    botDragRef.current = { from: bot.id, over: null };
+    setDraggingBotId(bot.id);
+  };
+
+  const onBotDragOver = (bot: Bot, event: React.DragEvent<HTMLElement>) => {
+    const from = botDragRef.current.from;
+    const group = botDragGroups.get(bot.id);
+    if (!from || !group || group !== botDragGroups.get(from)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = "move";
+    const rect = event.currentTarget.getBoundingClientRect();
+    const next = { id: bot.id, place: (event.clientY < rect.top + rect.height / 2 ? "before" : "after") as SectionDropPlace };
+    botDragRef.current.over = next;
+    setBotDropTarget(next);
+  };
+
+  const onBotDrop = (bot: Bot, event: React.DragEvent<HTMLElement>) => {
+    const from = botDragRef.current.from ?? event.dataTransfer.getData(BOT_DRAG_TYPE) ?? "";
+    const group = botDragGroups.get(bot.id);
+    const over = botDragRef.current.over;
+    if (!from || !group || group !== botDragGroups.get(from) || !over) { resetBotDrag(); return; }
+    event.preventDefault();
+    event.stopPropagation();
+    const next = placeSection([...group], from, over.id, over.place);
+    resetBotDrag();
+    if (next.join("\0") === group.join("\0")) return;
+    const movedBot = state.bots.find((candidate) => candidate.id === from);
+    const position = next.indexOf(from);
+    setReorderAnnouncement(t("sidebar.section.moved", {
+      name: movedBot?.name ?? "",
+      position: position + 1,
+      count: next.length,
+    }));
+    dispatch({ type: "botsOrdered", botIds: next });
+    void api("/api/bots/order", { method: "PUT", body: JSON.stringify({ botIds: next }) })
+      .then((response: { botIds?: string[] }) => {
+        if (Array.isArray(response?.botIds) && response.botIds.length) dispatch({ type: "botsOrdered", botIds: response.botIds });
+      })
+      .catch((cause) => dispatch({ type: "error", message: cause instanceof Error ? cause.message : String(cause) }));
+  };
+
+  const botDragFor = (bot: Bot): BotRowProps["rosterDrag"] => {
+    // Only while Alt is held, so an idle row keeps a stable prop and stays memoized.
+    if (!altHeld) return undefined;
+    const group = botDragGroups.get(bot.id);
+    if (!group || !layoutInteractive) return undefined;
+    return {
+      onDragStart: (event) => onBotDragStart(bot, event),
+      onDragOver: (event) => onBotDragOver(bot, event),
+      onDrop: (event) => onBotDrop(bot, event),
+      onDragEnd: resetBotDrag,
+      enabled: altHeld,
+      dragging: draggingBotId === bot.id,
+      place: botDropTarget?.id === bot.id ? botDropTarget.place : null,
+    };
+  };
   const archivedBots = state.bots.filter((bot) => bot.hidden && !bot.movedTo);
   const attention = crossBotAttentionThreads(state.bots, state.pendingQueued, undefined, state.groups);
   const pinnedThreads = crossBotPinnedThreads(state.bots, state.groups, state.pendingQueued);
   const pendingBotUndo = teamFeedback?.restoreBot;
-  const botRow = (bot: Bot) => botRowProps(state, dispatch, bot, { density, quiet: quietRows, query: q, onMenu: setMenu });
+  const botRow = (bot: Bot) => botRowProps(state, dispatch, bot, { density, quiet: quietRows, query: q, onMenu: setMenu, rosterDrag: botDragFor(bot) });
   const plusControl = (
     <div ref={plusMenuRef} className="contents">
     <button
@@ -1506,11 +1635,11 @@ export function Sidebar({ open, onClose, collapseToIcons = false }: {
       aria-label={remoteClient ? t("sidebar.new") : t("sidebar.newOrShare")}
       className={rail ? SIMPLE_RAIL_BUTTON : simple ? SIMPLE_TOP_BUTTON : cn(
         "flex items-center justify-center text-ink-secondary hover:bg-raised hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
-        density === "icons" ? "size-[46px] shrink-0 rounded-xl" : "size-8 rounded-md",
+        "size-8 shrink-0 rounded-md",
       )}
       title={remoteClient ? t("sidebar.new") : t("sidebar.newOrShare")}
     >
-      <Plus size={rail ? 18 : density === "icons" ? 20 : simple ? 16 : 17} strokeWidth={2} />
+      <Plus size={rail ? 18 : simple ? 16 : 17} strokeWidth={2} />
     </button>
     {plusMotion.shown && (
       <>
@@ -1615,12 +1744,6 @@ export function Sidebar({ open, onClose, collapseToIcons = false }: {
         {macInset ? (
           // The macOS 26 traffic lights span 16-76px; nothing clickable starts before 88px.
           <div aria-hidden="true" data-traffic-light-space className={density === "icons" ? "h-5 w-full" : "w-[72px] shrink-0"} />
-        ) : browser ? (
-          <div className={cn("flex shrink-0 items-center gap-2", density !== "icons" && "mr-3")}>
-            <span className="size-3 rounded-full bg-[#ff5f57]" />
-            <span className="size-3 rounded-full bg-[#febc2e]" />
-            <span className="size-3 rounded-full bg-[#28c840]" />
-          </div>
         ) : null}
         {density !== "icons" && (
           <div data-sidebar-top-slot className={cn("@container/sidebar-top flex min-w-0 flex-1 items-center", simple && "justify-end")}>
@@ -1642,20 +1765,20 @@ export function Sidebar({ open, onClose, collapseToIcons = false }: {
             aria-label={density === "icons" ? t("sidebar.density.expand") : t("sidebar.density.collapseAria")}
             className={cn(
               "flex items-center justify-center text-ink-secondary hover:bg-raised hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
-              density === "icons" ? "size-[46px] shrink-0 rounded-xl" : "size-8 rounded-md",
+              "size-8 shrink-0 rounded-md",
             )}
             title={density === "icons" ? t("sidebar.density.expand") : t("sidebar.density.collapse")}
           >
-            {density === "icons" ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={17} />}
+            {density === "icons" ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
           </button>}
           {density === "icons" && <button
             type="button"
             onClick={openCommandPalette}
             aria-label={t("sidebar.searchAria")}
             title={t("sidebar.searchAria")}
-            className="flex size-[46px] shrink-0 items-center justify-center rounded-xl text-ink-secondary hover:bg-raised hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            className="flex size-8 shrink-0 items-center justify-center rounded-md text-ink-secondary hover:bg-raised hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           >
-            <Search size={20} strokeWidth={2} />
+            <Search size={17} strokeWidth={2} />
           </button>}
           {advanced && <div ref={attentionMenuRef} className={density === "icons" ? "relative" : "contents"}>
             <button
@@ -1665,10 +1788,10 @@ export function Sidebar({ open, onClose, collapseToIcons = false }: {
               title={attentionTriggerLabel(attention.length)}
               className={cn(
                 "relative flex items-center justify-center text-ink-secondary hover:bg-raised hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
-                density === "icons" ? "size-[46px] shrink-0 rounded-xl" : "size-8 rounded-md",
+                "size-8 shrink-0 rounded-md",
               )}
             >
-              <Activity size={density === "icons" ? 20 : 17} strokeWidth={2} />
+              <Activity size={17} strokeWidth={2} />
               {attention.length > 0 && (
                 <span className="absolute -right-0.5 -top-0.5 flex min-w-4 items-center justify-center rounded-full bg-accent px-0.5 text-[9.5px] font-semibold leading-4 text-ink">{attention.length > 9 ? "9+" : attention.length}</span>
               )}
