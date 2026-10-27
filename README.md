@@ -1,3 +1,8 @@
+> **OMB-Merkle** — fork de [OpenMausBot](https://github.com/milind-soni/OpenMausBot) `v0.1.127`
+> (base `f47495187`) con los parches `0001`–`0015` de Merkle.Space. Licencia Apache-2.0.
+> Tags: `base-v0.1.127` (dónde nace) · `alfa-p15` (tip que sirve alfa.merkle.space).
+> Para traer novedades del upstream: `git fetch upstream --tags` y comparar contra el tag de release.
+
 <div align="center">
 
 # OpenMausBot
