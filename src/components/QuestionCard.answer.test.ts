@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BotEditorStore, type Message, type useStore } from "@/state/store";
+import { setAdvancedMode } from "@/lib/interface-mode";
 import type { AskQuestion } from "../../shared/ask-question";
 import { answersInOneTap, initialDraft, QuestionCard } from "./QuestionCard";
 
@@ -48,6 +49,9 @@ function press(field: HTMLElement, init: KeyboardEventInit) {
 }
 
 beforeEach(() => {
+  // Personalizacion Manager: this build is born in Advanced mode (base patches),
+  // so the Simple-mode expectation below has to ask for Simple explicitly.
+  setAdvancedMode(false);
   host = document.createElement("div");
   document.body.appendChild(host);
   root = createRoot(host);

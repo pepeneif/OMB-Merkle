@@ -131,7 +131,9 @@ describe("routine results navigation", () => {
   });
 
   it("returns from an execution chat to its group-owned source task", () => {
-    fixture.state!.routineRuns = [{ ...run, sourceThreadId: "original-room-source" }];
+    // Personalizacion Manager (0009): the chat banner is a problem signal, so the
+    // run has to have failed for "Back to results" to appear.
+    fixture.state!.routineRuns = [{ ...run, status: "failed", sourceThreadId: "original-room-source" }];
     const buttons = buttonsFrom(() => ChatView({ bot }));
     expect(buttons.has("Back to results")).toBe(true);
     buttons.get("Back to results")!.onClick!();

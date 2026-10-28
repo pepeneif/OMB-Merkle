@@ -69,17 +69,17 @@ describe("interface mode", () => {
   });
 
   it("marks the page with the mode it boots in", async () => {
-    const simple = await fresh();
-    simple.settleAdvancedModeDefault();
-    simple.applyInterfaceMode();
-    expect(root.dataset.interface).toBe("simple");
-
-    root.dataset = {};
-    local.setItem(simple.ADVANCED_MODE_KEY, "1");
     const advanced = await fresh();
     advanced.settleAdvancedModeDefault();
     advanced.applyInterfaceMode();
     expect(root.dataset.interface).toBe("advanced");
+
+    root.dataset = {};
+    local.setItem(advanced.ADVANCED_MODE_KEY, "0");
+    const simple = await fresh();
+    simple.settleAdvancedModeDefault();
+    simple.applyInterfaceMode();
+    expect(root.dataset.interface).toBe("simple");
   });
 
   it("moves the page mark when the mode is switched", async () => {

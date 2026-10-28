@@ -2,7 +2,7 @@
 import { createElement } from "react";
 import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppState, Bot, InstanceInfo, Message } from "@/state/store";
 
 vi.mock("./ChatMarkdown", async (importOriginal) => ({
@@ -59,6 +59,10 @@ afterAll(() => {
 });
 
 describe("conversational replies", () => {
+  // Personalizacion Manager: this build is born in Advanced mode (base patches),
+  // so the Simple-mode expectations below have to ask for Simple explicitly.
+  beforeEach(() => setAdvancedMode(false));
+
   it("draws one bubble per message break and keeps the code block whole", async () => {
     await draw(profile({ replyStyle: "conversational" }));
     expect(segments()).toEqual(["Found it.", "```ts\nconst a = 1;\n\nconst b = 2;\n```", "Want me to run it?"]);

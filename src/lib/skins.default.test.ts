@@ -39,11 +39,11 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllGlobals(); });
 
 describe("default skin", () => {
-  it("opens a fresh install following the computer's light or dark setting, in Simple mode, and keeps following it", async () => {
-    expect(await boot()).toEqual({ skin: "daylight", advanced: false, stored: "system" });
+  it("opens a fresh install following the computer's light or dark setting, in Advanced mode, and keeps following it", async () => {
+    expect(await boot()).toEqual({ skin: "daylight", advanced: true, stored: "system" });
     values.set("omb-installed", "2026-10-17T00:00:00.000Z");
     os.dark = true;
-    expect(await boot()).toEqual({ skin: "midnight", advanced: false, stored: "system" });
+    expect(await boot()).toEqual({ skin: "midnight", advanced: true, stored: "system" });
   });
 
   it("switches between Daylight and Midnight when the computer does, while following it", async () => {

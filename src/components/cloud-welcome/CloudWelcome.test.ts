@@ -70,6 +70,9 @@ beforeEach(() => {
     setItem: (key: string, value: string) => { stored.set(key, value); },
     removeItem: (key: string) => { stored.delete(key); },
   });
+  // Personalizacion Manager: this build is born in Advanced mode (base patches),
+  // so a case that means Simple has to store Simple; the Advanced cases set "1" themselves.
+  localStorage.setItem(ADVANCED_MODE_KEY, "0");
   fixture.plan = null;
   fixture.imported = null;
   fixture.state = {

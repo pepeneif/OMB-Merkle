@@ -55,7 +55,8 @@ const switchTo = async (threadId: string) => {
   flushSync(() => dispatch({ type: "switchGroupTask", groupId: "room", threadId }));
   await settle();
 };
-const switchPath = (threadId: string) => `/api/groups/room/tasks/${threadId}?messages=200`;
+// Personalizacion Manager (parche 0008): MESSAGE_PAGE_SIZE es 50, no 200.
+const switchPath = (threadId: string) => `/api/groups/room/tasks/${threadId}?messages=50`;
 
 beforeAll(async () => {
   vi.stubGlobal("EventSource", FixtureEventSource);

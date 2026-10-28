@@ -125,8 +125,9 @@ describe("the header's right side", () => {
   it("keeps Stop in the Advanced header while a turn runs", () => {
     const { controls } = header({ ...bot, busy: true, tasks: (bot.tasks ?? []).map((task) => ({ ...task, busy: true })) });
     expect(controls).toContain('title="Stop this turn"');
-    // Stop plus the header's find button; the bot carries no usage so no chip.
-    expect(controls.match(/<button/g)).toHaveLength(2);
+    // Personalizacion Manager (0010): Stop + buscar + el boton de la computadora. El modelo
+    // va mockeado como span en este archivo, asi que no cuenta como boton.
+    expect(controls.match(/<button/g)).toHaveLength(3);
     fixture.advanced = true;
   });
 
@@ -145,56 +146,46 @@ describe("the header's right side", () => {
 });
 
 describe("the Simple header", () => {
-  it("is one pill: the avatar and name, with a dot for another busy conversation and no title, role or way back", () => {
-    const busyElsewhere: Bot = { ...bot, title: "Research", mainThreadId: "other", tasks: [...bot.tasks!, { threadId: "other", title: "Other", createdAt: 0, busy: true, activity: "working" }] };
+  it("keeps the Bot / Conversation title in Simple mode, in place of the other-activity picker and the way back, and only there", () => {
+    const busyElsewhere: Bot = { ...bot, mainThreadId: "other", tasks: [...bot.tasks!, { threadId: "other", title: "Other", createdAt: 0, busy: true, activity: "working" }] };
     fixture.advanced = false;
-    const simple = renderToStaticMarkup(createElement(ChatView, { bot: busyElsewhere }));
-    const identity = simple.slice(simple.indexOf("data-chathead-identity"), simple.indexOf("data-chathead-controls"));
-    // Simple mode keeps the Bot / Conversation title; Advanced swaps in the thread picker.
-    expect(identity).toContain("data-chathead-conversation");
-    expect(identity).toMatch(/data-chathead-conversation[^>]*><span dir="auto" class="truncate">Selected<\/span>/);
-    expect(simple).not.toContain("data-background-activity");
-    expect(simple).not.toContain("data-chathead-back");
-    window.ogb = { remoteClient: { active: true } } as NonNullable<Window["ogb"]>;
     try {
       const simple = renderToStaticMarkup(createElement(ChatView, { bot: busyElsewhere }));
       const identity = simple.slice(simple.indexOf("data-chathead-identity"), simple.indexOf("data-chathead-controls"));
-      const pill = identity.match(/<button[^>]*data-chathead-pill="true"[^>]*>([\s\S]*?)<\/button>/)!;
-      expect(identity.replace(pill[0], "").replace(/<span role="status"[^>]*>[^<]*<\/span>/, "")).not.toMatch(/<(button|a|span)[\s>]/);
-      expect(pill[1]).toContain(">Pepper</span>");
-      expect(pill[1]).toContain('data-chathead-elsewhere="true"');
-      expect(pill[0].match(/class="([^"]*)"/)![1]!.split(" ")).toEqual(expect.arrayContaining(["rounded-full", "bg-composer", "ring-[0.5px]", "py-[7.5px]", "pr-[13.5px]"]));
-      // Away from the bot's main conversation, the pill names the one on screen.
-      expect(pill[1]).toContain("data-chathead-conversation");
-      for (const gone of ["data-chathead-role", "data-background-activity", "data-chathead-back", 'data-testid="chat-more"']) {
-        expect(simple, gone).not.toContain(gone);
-      }
+      // Personalizacion Manager (0010): en Simple va el titulo de la conversacion pegado al nombre,
+      // no la pildora redondeada del upstream.
+      expect(identity).toContain("data-chathead-conversation");
+      expect(identity).toMatch(/data-chathead-conversation[^>]*><span dir="auto" class="truncate">Selected<\/span>/);
+      expect(simple).not.toContain("data-chathead-pill");
+      expect(simple).not.toContain("data-background-activity");
+      expect(simple).not.toContain("data-chathead-back");
       window.ogb = { remoteClient: { active: true } } as NonNullable<Window["ogb"]>;
-      try {
-        const remote = renderToStaticMarkup(createElement(ChatView, { bot: busyElsewhere }));
-        expect(remote).not.toContain("data-chathead-elsewhere");
-        expect(remote).toContain("data-background-activity");
-      } finally {
-        delete window.ogb;
-      }
-    } finally {
+      const remote = renderToStaticMarkup(createElement(ChatView, { bot: busyElsewhere }));
+      expect(remote).not.toContain("data-chathead-conversation");
+      expect(remote).toContain("data-background-activity");
+      delete window.ogb;
       fixture.advanced = true;
+      fixture.showThreads = false;
+      const advanced = renderToStaticMarkup(createElement(ChatView, { bot: busyElsewhere }));
+      expect(advanced).not.toContain("data-chathead-conversation");
+      expect(advanced).toContain("data-background-activity");
+      expect(advanced).toContain("data-chathead-back");
+    } finally {
+      delete window.ogb;
+      fixture.advanced = true;
+      fixture.showThreads = true;
     }
-    fixture.showThreads = false;
-    const advanced = renderToStaticMarkup(createElement(ChatView, { bot: busyElsewhere }));
-    expect(advanced).not.toContain("data-chathead-elsewhere");
-    expect(advanced).toContain("data-background-activity");
-    expect(advanced).toContain("data-chathead-back");
-    expect(advanced).toContain("data-chathead-role");
-    fixture.showThreads = true;
   });
 
-  it("opens the bot panel from the pill", () => {
+  it("opens the bot panel from the name in the header, with no pill around it", () => {
     fixture.advanced = false;
     fixture.dispatch.mockClear();
     try {
       const markup = renderToStaticMarkup(createElement(ChatView, { bot }));
-      expect(markup).toMatch(/<button[^>]*data-chathead-pill="true"[^>]*aria-label="Open Pepper&#x27;s profile"/);
+      // Personalizacion Manager (0010): sin pildora; el nombre (con el lapiz al lado) abre el perfil.
+      expect(markup).not.toContain("data-chathead-pill");
+      expect(markup).toContain('aria-label="Open Pepper&#x27;s profile"');
+      expect(markup).toContain("Rename Pepper");
     } finally {
       fixture.advanced = true;
     }
