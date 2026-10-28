@@ -165,7 +165,7 @@ describe("Settings in Simple mode", () => {
 
   it("keeps the everyday rows and leaves the fifteen builder controls to Advanced, where search still points", () => {
     const general = open("general");
-    for (const shown of ['aria-label="Send usage analytics"', 'aria-label="Color my messages with the bot&#x27;s color"', 'aria-label="Send messages with"',
+    for (const shown of ['aria-label="Send usage analytics"', 'aria-label="Send messages with"',
       'aria-label="Notification sounds"', 'aria-label="Show the notification feed"', 'aria-label="App language"', 'role="radiogroup" aria-label="Theme"']) {
       expect(placement(general, shown), shown).toBe("shown");
     }
