@@ -5,6 +5,7 @@ import {
   BOTS_SECTION_ID,
   CHANNELS_SECTION_ID,
   PINNED_SECTION_ID,
+  botRosterGroups,
   keepFixedSectionSlots,
   mergeSectionOrder,
   moveSection,
@@ -298,5 +299,35 @@ describe("the primary tile", () => {
     expect(tiled.unsectionedBots.map((candidate) => candidate.id)).toEqual(["bea"]);
     expect(tiled.sectionChiefs.map((candidate) => candidate.id)).toEqual(["lead"]);
     expect(withPrimaryTile(parts, undefined).primary).toBeNull();
+  });
+});
+
+describe("bot roster drag groups", () => {
+  const groups = botRosterGroups({
+    pinned: ["atlas", "bea"],
+    sections: [
+      { chiefs: ["chief"], members: ["dodo", "eve"] },
+      { chiefs: [], members: ["solo"] },
+    ],
+    unsectioned: ["linus"],
+  });
+
+  it("maps each bot to the roster it may reorder within", () => {
+    expect(groups.get("atlas")).toEqual(["atlas", "bea"]);
+    expect(groups.get("bea")).toEqual(["atlas", "bea"]);
+    expect(groups.get("dodo")).toEqual(["dodo", "eve"]);
+    expect(groups.get("eve")).toEqual(["dodo", "eve"]);
+  });
+
+  it("leaves out rosters with a single bot (a lone chief or member) and the loose bots, which cannot reorder", () => {
+    expect(groups.has("chief")).toBe(false);
+    expect(groups.has("solo")).toBe(false);
+    expect(groups.has("linus")).toBe(false);
+  });
+
+  it("keeps the pinned roster whole: a dragged bot never lands in another group", () => {
+    const pinned = groups.get("atlas")!;
+    expect(pinned).not.toContain("dodo");
+    expect(pinned).not.toContain("linus");
   });
 });

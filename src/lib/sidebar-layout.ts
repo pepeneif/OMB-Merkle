@@ -88,6 +88,24 @@ export function sidebarLayoutInteractive(density: SidebarDensityMode, query: str
   return density !== "icons" && query.trim().length === 0;
 }
 
+/** The rosters a bot can be dragged within: Pinned, each department (its chief, then its members), and the loose bots.
+ * The server keeps one fleet order (PUT /api/bots/order), so a drag only ever reorders the ids inside one group and
+ * every other bot keeps its place. A group of one bot has nothing to reorder, so it is left out. */
+export function botRosterGroups(input: {
+  pinned: readonly string[];
+  sections: readonly { chiefs: readonly string[]; members: readonly string[] }[];
+  unsectioned: readonly string[];
+}): Map<string, readonly string[]> {
+  const groups = [
+    input.pinned,
+    ...input.sections.flatMap((section) => [section.chiefs, section.members]),
+    input.unsectioned,
+  ].filter((ids) => ids.length > 1);
+  const byId = new Map<string, readonly string[]>();
+  for (const ids of groups) for (const id of ids) byId.set(id, ids);
+  return byId;
+}
+
 export function sidebarSectionCollapsed(
   id: SidebarSectionId,
   collapsedIds: SidebarSectionId[],

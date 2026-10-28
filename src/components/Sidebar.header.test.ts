@@ -183,11 +183,14 @@ describe("sidebar top row", () => {
     },
   );
 
-  it("keeps the browser build's placeholder lights 12px clear of the drag space and buttons", () => {
+  it("draws no traffic-light ornament in the browser build: the row starts at the drag space", () => {
     const row = topRow(render());
-    expect(row).toContain('<div class="flex shrink-0 items-center gap-2 mr-3"><span class="size-3 rounded-full bg-[#ff5f57]"></span>');
-    const { spacer, buttons } = order(row);
-    expect(spacer).toBeGreaterThan(row.indexOf("bg-[#28c840]"));
+    expect(row).not.toContain("bg-[#ff5f57]");
+    expect(row).not.toContain("bg-[#febc2e]");
+    expect(row).not.toContain("bg-[#28c840]");
+    const { slot, spacer, buttons } = order(row);
+    expect(slot).toBeGreaterThan(-1);
+    expect(spacer).toBeGreaterThan(slot);
     expect(buttons).toBeGreaterThan(spacer);
   });
 

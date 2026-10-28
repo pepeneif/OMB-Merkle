@@ -116,7 +116,8 @@ export function SidebarFooterNav({
   const iconsOnly = density === "icons";
   const toolsLayout = useSidebarToolsLayout();
   const toolbar = advanced && !iconsOnly && toolsLayout === "toolbar";
-  const iconSize = iconsOnly && !rail ? 20 : 18;
+  // v0.1.107 draws every rail icon at 20px; keep that so the collapsed foot matches it.
+  const iconSize = iconsOnly ? 20 : 18;
   const tone = (active: boolean) => (active ? "text-accent" : "text-ink-secondary");
   const automationsNeedYou = useAutomationsNeedYou();
   const automationsRow = <NavRow
