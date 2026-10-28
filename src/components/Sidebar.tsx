@@ -9,7 +9,7 @@ import { useTurnLive } from "@/state/turn-status";
 import { llmThreadTitlesEnabled } from "@/lib/feature-flags";
 
 import { BotAvatar } from "./Avatar";
-import { BotEngineMark, BotModelBadge, BotModelMark, botTooltip } from "./BotModelBadge"; import { SidebarBotRole } from "./BotRole";
+import { BotEngineMark, BotModelMark, botTooltip } from "./BotModelBadge"; import { SidebarBotRole } from "./BotRole";
 import { stateForBot } from "@/lib/mascot";
 import { cn } from "@/lib/cn";
 import { searchMatchesThreads, useSearchDisclosure } from "@/lib/search-disclosure";
@@ -778,7 +778,6 @@ export const BotListItem = memo(function BotListItem(props: BotRowProps) {
           motionKey={mascotMotion?.nonce ?? 0}
           animated={working || unread || (mascotMotion?.kind ?? "none") !== "none"}
         />
-        {iconOnly && <BotModelBadge bot={bot} instances={instances} avatarSize={avatarSize} subtle={railTile} />}
         {simpleRow && <AvatarActivityDot activity={working ? "working" : teammateWait ? "teammate" : queued && !waiting ? "queued" : null} />}
         {!simpleRow && working && (
           <span

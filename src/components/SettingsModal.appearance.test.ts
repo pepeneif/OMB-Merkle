@@ -279,17 +279,6 @@ describe("Settings → Appearance", () => {
     expect(fixture.api).not.toHaveBeenCalled();
   });
 
-  it("offers the bot-colored message toggle in Appearance, off until chosen", () => {
-    const html = render();
-    expect(html).toContain("Color my messages");
-    expect(html).toContain("bot&#x27;s color");
-    expect(html).toContain("Rooms keep the neutral bubble");
-    const toggle = fixture.switches.find((props) => props["aria-label"] === "Color my messages with the bot's color")!;
-    expect(toggle.checked).toBe(false);
-    toggle.onClick!({} as never);
-    expect(fixture.setColorUserBubbles).toHaveBeenCalledWith(true);
-    expect(fixture.api).not.toHaveBeenCalled();
-  });
 
   it.each([
     ["standard", "Standard"],
@@ -301,7 +290,6 @@ describe("Settings → Appearance", () => {
     expect(html).toContain('aria-label="Chat width"');
     expect(html).toContain(`<option value="${width}" selected="">${label}</option>`);
     for (const option of ["Standard", "Wide", "Full width"]) expect(html).toContain(`>${option}</option>`);
-    expect(html).toContain("Color my messages");
     expect(fixture.api).not.toHaveBeenCalled();
     expect(fixture.dispatch).not.toHaveBeenCalled();
   });

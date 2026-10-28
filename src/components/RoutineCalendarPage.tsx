@@ -127,7 +127,7 @@ function activeRoomMembers(group: Group | undefined, bots: Bot[]): Bot[] {
   if (!group) return bots.filter((bot) => !bot.hidden);
   return group.memberIds.flatMap((id) => {
     const bot = bots.find((candidate) => candidate.id === id);
-    return bot && !bot.hidden ? [bot] : [];
+    return bot && !bot.hidden && !bot.sidebarHidden ? [bot] : [];
   });
 }
 

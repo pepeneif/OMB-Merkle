@@ -89,9 +89,10 @@ describe("sidebar bot row", () => {
   });
   afterEach(() => { vi.unstubAllGlobals(); });
 
-  // Comfortable and compact put the mark at the end of the row's text, clear of the avatar's status dots;
-  // icons-only has no row text, so the badge stays on the avatar.
-  it.each<[SidebarDensity, string]>([["comfortable", "ml-auto"], ["compact", "ml-auto"], ["icons", "absolute -bottom-0.5 -left-0.5"]])(
+  // Comfortable and compact put the mark at the end of the row's text, clear of the avatar's status dots.
+  // icons-only has no row text and no badge on the avatar either (the owner's ask, 2026-10-26): the
+  // provider mark on a collapsed avatar read as clutter beside the model name already in the header.
+  it.each<[SidebarDensity, string]>([["comfortable", "ml-auto"], ["compact", "ml-auto"]])(
     "shows the model once in a %s row", (density, placement) => {
       const found = badges(render(bot("claude", "opus"), density));
       expect(found).toHaveLength(1);
@@ -99,8 +100,12 @@ describe("sidebar bot row", () => {
       expect(found[0]).toContain(placement);
     });
 
+  it("shows no model badge on an icons-only row", () => {
+    expect(badges(render(bot("claude", "opus"), "icons"))).toHaveLength(0);
+  });
+
   // Simple mode shows the mark too (the owner's ask, 2026-10-22): a person sees which provider each bot runs on at a glance.
-  it.each<SidebarDensity>(["comfortable", "compact", "icons"])("shows the model once in a Simple mode %s row", (density) => {
+  it.each<SidebarDensity>(["comfortable", "compact"])("shows the model once in a Simple mode %s row", (density) => {
     fixture.advanced = false;
     const found = badges(render(bot("claude", "opus"), density));
     expect(found).toHaveLength(1);

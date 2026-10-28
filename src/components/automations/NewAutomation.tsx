@@ -25,7 +25,7 @@ export function NewAutomation({ initialText = "", onClose, onSetUpYourself }: {
   onSetUpYourself: (kind: SetUpKind, botId: string) => void;
 }) {
   const { state, dispatch } = useStore();
-  const bots = state.bots.filter((bot) => !bot.hidden);
+  const bots = state.bots.filter((bot) => !bot.hidden && !bot.sidebarHidden);
   const [text, setText] = useState(initialText);
   const [botId, setBotId] = useState(() => defaultBot(bots, state.selectedId)?.id ?? "");
   const [yourself, setYourself] = useState(false);
