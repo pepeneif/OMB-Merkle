@@ -40,7 +40,7 @@ export function UpdateIndicator({ className }: { className?: string }) {
   const ready = state.status === "downloaded";
   return (
     <div
-      className={cn("flex size-[46px] shrink-0 items-center justify-center", className)}
+      className={cn("flex size-10 shrink-0 items-center justify-center", className)}
     >
       <button
         ref={buttonRef}

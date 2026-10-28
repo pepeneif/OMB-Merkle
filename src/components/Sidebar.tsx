@@ -1,7 +1,7 @@
 import { OrganizationIdentity } from "./OrganizationIdentity";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type Dispatch } from "react";
 import { createPortal } from "react-dom";
-import { Activity, Archive, Bot as BotIcon, Check, ChevronRight, ClipboardCopy, Crown, FolderPlus, Library, Loader2, MessageSquarePlus, MoreHorizontal, Pencil, PanelLeftClose, PanelLeftOpen, Phone, Pin, PinOff, Plus, Search, TextQuote, Trash2, Users, X } from "lucide-react";
+import { Activity, Archive, Bot as BotIcon, Check, ChevronRight, ClipboardCopy, Crown, FolderPlus, GripVertical, Library, Loader2, MessageSquarePlus, MoreHorizontal, Pencil, PanelLeftClose, PanelLeftOpen, Phone, Pin, PinOff, Plus, Search, TextQuote, Trash2, Users, X } from "lucide-react";
 import { api, useStore, formatTime, visibleMessages, currentTaskBot, botOpensTo, openBot, openThread, type Action, type AppState, type Bot, type BotProject, type Group, type InstanceInfo, type Message } from "@/state/store";
 import { approvalModeFor } from "../../shared/approval-mode";
 import { liveActivityLabel, turnNowPhrases } from "@/lib/live-activity";
@@ -695,14 +695,14 @@ export interface BotRowProps {
   dispatch: Dispatch<Action>;
   onMenu: (menu: MenuState) => void;
   renameRequest?: number;
-  /** Alt+drag reordering of the bot roster (the fleet order lives on the server, PUT /api/bots/order). */
+  /** This row sits in a roster that has more than one bot, so it can be dragged to reorder it. */
+  reorderable?: boolean;
+  /** Reordering a bot within its roster (the fleet order lives on the server, PUT /api/bots/order).
+   * Rendered only while a drag is in flight or Alt is held, so an idle row keeps a stable prop and stays memoized;
+   * the drag events themselves are delegated on the list container. */
   rosterDrag?: {
-    onDragStart: (event: React.DragEvent<HTMLElement>) => void;
-    onDragOver: (event: React.DragEvent<HTMLElement>) => void;
-    onDrop: (event: React.DragEvent<HTMLElement>) => void;
-    onDragEnd: () => void;
-    /** True only while Alt is held, so a plain drag stays a no-op. */
-    enabled: boolean;
+    /** Alt is held: the whole expanded row, not just the grip handle, is a drag source. */
+    armed: boolean;
     dragging: boolean;
     place: "before" | "after" | null;
   };
@@ -712,7 +712,7 @@ export function botRowProps(
   state: AppState,
   dispatch: Dispatch<Action>,
   bot: Bot,
-  layout: Pick<BotRowProps, "density" | "quiet" | "query" | "onMenu" | "renameRequest"> & { rosterDrag?: BotRowProps["rosterDrag"] },
+  layout: Pick<BotRowProps, "density" | "quiet" | "query" | "onMenu" | "renameRequest"> & { reorderable?: boolean; rosterDrag?: BotRowProps["rosterDrag"] },
 ): BotRowProps {
   const selected = state.activeView === "chat" && state.selectedId === bot.id;
   const reveal = state.revealThread;
@@ -744,7 +744,7 @@ function WorkingPhrase({ threadId, last }: { threadId: string; last?: Message })
 
 export const BotListItem = memo(function BotListItem(props: BotRowProps) {
   const advanced = useAdvancedMode();
-  const { bot, selected, deleting, mascotMotion, reveal, pendingQueued, instances, liveCall, density, quiet, query, dispatch, onMenu, renameRequest, rosterDrag } = props;
+  const { bot, selected, deleting, mascotMotion, reveal, pendingQueued, instances, liveCall, density, quiet, query, dispatch, onMenu, renameRequest, reorderable, rosterDrag } = props;
   const showThreads = useShowThreads();
   const liveMedia = useLiveMedia();
   const remoteClient = typeof window !== "undefined" && window.ogb?.remoteClient?.active === true;
@@ -933,11 +933,7 @@ export const BotListItem = memo(function BotListItem(props: BotRowProps) {
         data-sidebar-bot-row={bot.id}
         title={renaming ? undefined : tooltip}
         data-sidebar-bot-drag={rosterDrag?.place ?? undefined}
-        draggable={rosterDrag?.enabled || undefined}
-        onDragStart={rosterDrag?.onDragStart}
-        onDragOver={rosterDrag?.onDragOver}
-        onDrop={rosterDrag?.onDrop}
-        onDragEnd={rosterDrag?.onDragEnd}
+        draggable={iconOnly || rosterDrag?.armed || undefined}
         onClick={onSelect}
         onKeyDown={(event) => {
           if (renaming) return;
@@ -960,6 +956,23 @@ export const BotListItem = memo(function BotListItem(props: BotRowProps) {
       ><ChevronRight aria-hidden="true" size={13} className={cn("transition-transform", threadsOpen && "rotate-90")} /></button>}
       {!renaming && iconOnly && unread && (
         <span className={cn("pointer-events-none absolute size-2 rounded-full border border-panel bg-accent", railTile ? "right-1 top-1" : "bottom-1.5 right-1.5")} />
+      )}
+      {reorderable && !renaming && !deleting && !iconOnly && (
+        // Sits just left of the row buttons that appear on hover (showThreads draws +, folder and the menu,
+        // whether or not the thread list itself is open). In the icons-only rail a row is a permanent drag
+        // source instead, so no grip is drawn there.
+        <span
+          data-bot-drag-handle={bot.id}
+          draggable
+          aria-hidden="true"
+          title={t("sidebar.section.dragToReorder")}
+          className={cn(
+            "absolute top-1/2 z-10 flex size-5 -translate-y-1/2 cursor-grab items-center justify-center rounded text-ink-secondary opacity-0 hover:bg-raised hover:text-ink group-hover:opacity-100 group-focus-within:opacity-100 active:cursor-grabbing",
+            showThreads ? "right-[6.25rem]" : "right-9",
+          )}
+        >
+          <GripVertical size={13} />
+        </span>
       )}
       {!renaming && !deleting && !iconOnly && <>
         {showThreads && <button type="button" aria-label={t("task.newShort")} title={t("task.newShort")} onClick={() => { setThreadsOpen(true); dispatch({ type: "newTask", botId: bot.id }); }}
@@ -1301,6 +1314,7 @@ export function Sidebar({ open, onClose, collapseToIcons = false }: {
   };
 
   const updateSectionDropTarget = (event: React.DragEvent<HTMLDivElement>, id: string) => {
+    if (event.dataTransfer.types.includes(BOT_DRAG_TYPE)) return;
     if (!layoutInteractive || !sectionDragRef.current.from) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
@@ -1312,7 +1326,7 @@ export function Sidebar({ open, onClose, collapseToIcons = false }: {
   };
 
   const dropSection = (event: React.DragEvent<HTMLDivElement>) => {
-    if (event.dataTransfer.types.includes(FOLDER_DRAG_TYPE)) return;
+    if (event.dataTransfer.types.includes(FOLDER_DRAG_TYPE) || event.dataTransfer.types.includes(BOT_DRAG_TYPE)) return;
     event.preventDefault();
     const from =
       event.dataTransfer.getData("application/x-openmausbot-sidebar-section") ||
@@ -1342,34 +1356,55 @@ export function Sidebar({ open, onClose, collapseToIcons = false }: {
     setBotDropTarget(null);
   };
 
-  const onBotDragStart = (bot: Bot, event: React.DragEvent<HTMLElement>) => {
-    const group = botDragGroups.get(bot.id);
-    if (!layoutInteractive || !event.altKey || !group) return;
-    event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData(BOT_DRAG_TYPE, bot.id);
-    event.dataTransfer.setData("text/plain", bot.id);
-    botDragRef.current = { from: bot.id, over: null };
-    setDraggingBotId(bot.id);
+  // The roster rows are memoized, so a per-row drag handler would hand every row a fresh prop each render.
+  // The drag lives on the list container instead and resolves the row from the event target.
+  // Element, not HTMLElement: the pointer often lands on an SVG inside the avatar, and SVGElement is not an HTMLElement.
+  const botDragIdFrom = (target: EventTarget | null): string | null => {
+    if (!(target instanceof Element)) return null;
+    const handle = target.closest("[data-bot-drag-handle]");
+    if (handle) return handle.getAttribute("data-bot-drag-handle");
+    return target.closest("[data-sidebar-bot-row]")?.getAttribute("data-sidebar-bot-row") ?? null;
   };
 
-  const onBotDragOver = (bot: Bot, event: React.DragEvent<HTMLElement>) => {
+  const onRosterDragStart = (event: React.DragEvent<HTMLElement>) => {
+    const botId = botDragIdFrom(event.target);
+    if (!botId) return;
+    const fromHandle = event.target instanceof Element && Boolean(event.target.closest("[data-bot-drag-handle]"));
+    // A plain drag stays a no-op unless it started on the grip handle, Alt is held, or the rail is collapsed
+    // (there a row is the only target and click-and-hold is the gesture).
+    if (!fromHandle && !event.altKey && density !== "icons") return;
+    const group = botDragGroups.get(botId);
+    if (!group) return;
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData(BOT_DRAG_TYPE, botId);
+    event.dataTransfer.setData("text/plain", botId);
+    botDragRef.current = { from: botId, over: null };
+    setDraggingBotId(botId);
+  };
+
+  const onRosterDragOver = (event: React.DragEvent<HTMLElement>) => {
     const from = botDragRef.current.from;
-    const group = botDragGroups.get(bot.id);
-    if (!from || !group || group !== botDragGroups.get(from)) return;
+    if (!from) return;
+    const botId = botDragIdFrom(event.target);
+    if (!botId) return;
+    const group = botDragGroups.get(botId);
+    if (!group || group !== botDragGroups.get(from)) return;
     event.preventDefault();
     event.stopPropagation();
     event.dataTransfer.dropEffect = "move";
-    const rect = event.currentTarget.getBoundingClientRect();
-    const next = { id: bot.id, place: (event.clientY < rect.top + rect.height / 2 ? "before" : "after") as SectionDropPlace };
+    const row = event.target instanceof Element ? event.target.closest<HTMLElement>("[data-sidebar-bot-row]") : null;
+    const rect = (row ?? (event.currentTarget as HTMLElement)).getBoundingClientRect();
+    const next = { id: botId, place: (event.clientY < rect.top + rect.height / 2 ? "before" : "after") as SectionDropPlace };
     botDragRef.current.over = next;
     setBotDropTarget(next);
   };
 
-  const onBotDrop = (bot: Bot, event: React.DragEvent<HTMLElement>) => {
+  const onRosterDrop = (event: React.DragEvent<HTMLElement>) => {
     const from = botDragRef.current.from ?? event.dataTransfer.getData(BOT_DRAG_TYPE) ?? "";
-    const group = botDragGroups.get(bot.id);
     const over = botDragRef.current.over;
-    if (!from || !group || group !== botDragGroups.get(from) || !over) { resetBotDrag(); return; }
+    const target = botDragIdFrom(event.target);
+    const group = target ? botDragGroups.get(target) : undefined;
+    if (!from || !target || !group || group !== botDragGroups.get(from) || !over) { resetBotDrag(); return; }
     event.preventDefault();
     event.stopPropagation();
     const next = placeSection([...group], from, over.id, over.place);
@@ -1391,16 +1426,12 @@ export function Sidebar({ open, onClose, collapseToIcons = false }: {
   };
 
   const botDragFor = (bot: Bot): BotRowProps["rosterDrag"] => {
-    // Only while Alt is held, so an idle row keeps a stable prop and stays memoized.
-    if (!altHeld) return undefined;
+    // An idle row carries no prop at all, so a drag starting elsewhere never re-renders it.
+    if (draggingBotId !== bot.id && botDropTarget?.id !== bot.id && !altHeld) return undefined;
     const group = botDragGroups.get(bot.id);
     if (!group || !layoutInteractive) return undefined;
     return {
-      onDragStart: (event) => onBotDragStart(bot, event),
-      onDragOver: (event) => onBotDragOver(bot, event),
-      onDrop: (event) => onBotDrop(bot, event),
-      onDragEnd: resetBotDrag,
-      enabled: altHeld,
+      armed: altHeld,
       dragging: draggingBotId === bot.id,
       place: botDropTarget?.id === bot.id ? botDropTarget.place : null,
     };
@@ -1410,7 +1441,7 @@ export function Sidebar({ open, onClose, collapseToIcons = false }: {
   const attention = crossBotAttentionThreads(state.bots, state.pendingQueued, undefined, state.groups);
   const pinnedThreads = crossBotPinnedThreads(state.bots, state.groups, state.pendingQueued);
   const pendingBotUndo = teamFeedback?.restoreBot;
-  const botRow = (bot: Bot) => botRowProps(state, dispatch, bot, { density, quiet: quietRows, query: q, onMenu: setMenu, renameRequest: renameRequest?.botId === bot.id ? renameRequest.nonce : 0, rosterDrag: botDragFor(bot) });
+  const botRow = (bot: Bot) => botRowProps(state, dispatch, bot, { density, quiet: quietRows, query: q, onMenu: setMenu, renameRequest: renameRequest?.botId === bot.id ? renameRequest.nonce : 0, reorderable: botDragGroups.has(bot.id), rosterDrag: botDragFor(bot) });
   const railSearch = () => {
     if (collapseToIcons) return openCommandPalette();
     setSearchOpen(true);
@@ -1708,7 +1739,13 @@ export function Sidebar({ open, onClose, collapseToIcons = false }: {
       {!advanced && !collapseToIcons && <SidebarEdgeToggle collapsed={rail} shown={rail || edgeShown} onHover={showEdge} onToggle={toggleCollapsed} style={windowNoDragStyle} anchorRef={sidebarRef} />}
 
       <GlassScroller className={rail ? "[scrollbar-gutter:stable_both-edges]" : simpleDesk ? "px-3" : "px-2"}>
-        <div className={cn("flex flex-col", simpleDesk ? cn("gap-0.5 pb-2", !tiles && "pt-2") : advanced ? "gap-0.5" : "gap-1 pb-2 pt-2")}>
+        <div
+          className={cn("flex flex-col", simpleDesk ? cn("gap-0.5 pb-2", !tiles && "pt-2") : advanced ? "gap-0.5" : "gap-1 pb-2 pt-2")}
+          onDragStart={layoutInteractive || density === "icons" ? onRosterDragStart : undefined}
+          onDragOver={layoutInteractive || density === "icons" ? onRosterDragOver : undefined}
+          onDrop={layoutInteractive || density === "icons" ? onRosterDrop : undefined}
+          onDragEnd={resetBotDrag}
+        >
           {matchingBots.length === 0 && visibleGroups.length === 0 && q && q.length < MIN_QUERY && (
             <div className="px-3 py-6 text-center text-[13px] text-ink-secondary">{t("sidebar.noMatch", { query })}</div>
           )}
