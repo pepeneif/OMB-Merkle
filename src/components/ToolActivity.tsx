@@ -17,7 +17,7 @@ export function ToolActivity({ tool, place = null, live = false }: { tool: NonNu
   const label = advanced ? tool.name : toolStepLabel(tool);
   const status = tool.ok === undefined ? (live ? t("toolDetail.running") : t("toolDetail.unverified")) : failed ? t("toolDetail.failed") : t("toolDetail.completed");
   return (
-    <details onToggle={(event) => setExpanded(event.currentTarget.open)} className="group/tool w-fit max-w-full rounded-xl border border-hairline/40 bg-panel text-[13px] open:w-[min(38rem,100%)]" data-testid="tool-activity">
+    <details onToggle={(event) => setExpanded(event.currentTarget.open)} className="group/tool w-fit max-w-full rounded-xl border border-hairline/40 bg-transparent text-[13px] open:w-[min(38rem,100%)]" data-testid="tool-activity">
       <summary
         role="button"
         aria-expanded={expanded}

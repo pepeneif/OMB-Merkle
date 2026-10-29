@@ -482,7 +482,7 @@ const Bubble = memo(function Bubble({
                 : user
                   ? cn("whitespace-pre-wrap text-ink", simple ? SIMPLE_USER_BUBBLE : "bg-bubble-user px-4 py-2.5")
                   : formatted
-                    ? cn(formattedReplyWidth(text), "px-1 text-ink")
+                    ? cn(formattedReplyWidth(text), "rounded-2xl bg-card px-4 py-2.5 text-ink")
                     : simple ? SIMPLE_BOT_BUBBLE : "bg-card px-4 py-2.5 text-ink",
             simple && join && !split && !attachmentsOnly && !tabled && joinedCorners(user ? "end" : "start", join),
           )}
