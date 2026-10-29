@@ -2540,11 +2540,11 @@ html[data-cloud-intent-morph] [data-tour="composer"] { view-transition-name: clo
    Unlayered, so it wins over the utilities it restyles. A picker miniature
    is not a scope root, so its few pixels keep the plain palette. */
 @scope ([data-skin="pop"]:not([data-skin-preview])) to ([data-skin]) {
-  /* Manager (0018): la linea del sticker deja de ser morada. Gris claro en el
-     mensaje de Jose (linea propia), gris mas oscuro en los del bot (abajo). */
+  /* Manager (0018/0019): la linea del sticker deja de ser morada y es la MISMA
+     en los dos lados: gris oscuro #5f5650, sin llegar a negro. */
   .bg-bubble-user {
-    border: 2px solid #c9c9c9;
-    box-shadow: 3px 3px 0 #c9c9c9;
+    border: 2px solid #5f5650;
+    box-shadow: 3px 3px 0 #5f5650;
   }
   .bg-app {
     background-image: radial-gradient(
@@ -2564,6 +2564,22 @@ html[data-cloud-intent-morph] [data-tour="composer"] { view-transition-name: clo
   .bg-card[data-chat-bubble="simple"] {
     border-color: #5f5650;
     box-shadow: 3px 3px 0 #5f5650;
+  }
+  /* Manager (0019): los fondos de las tablas de los mensajes del bot, en gris
+     neutro (a tono con el chip de <code>) en vez de los tonos cafe de la piel.
+     Solo toca los tokens DENTRO de la tabla; la piel no se mueve. */
+  .rich-table {
+    --color-panel: #f2f2f2;
+    --color-raised: #e8e8e8;
+    --color-inset: #ededed;
+    --color-hairline: #d4d4d4;
+  }
+  [data-table-card] {
+    --color-composer: #fafafa;
+    --color-composer-ring: #d4d4d4;
+    --color-ink: #1b1613;
+    --color-ink-secondary: #3a322d;
+    --color-ink-tertiary: #574f49;
   }
   .shadow-sm { --tw-shadow: 2px 2px 0 var(--color-ink); }
   .shadow-md { --tw-shadow: 3px 3px 0 var(--color-ink); }
@@ -2650,7 +2666,7 @@ html[data-cloud-intent-morph] [data-tour="composer"] { view-transition-name: clo
   box-shadow: 0 0 0 1px var(--color-ink);
 }
 [data-skin="pop"][data-skin-preview] .bg-bubble-user {
-  box-shadow: 1.5px 1.5px 0 #c9c9c9;
+  box-shadow: 1.5px 1.5px 0 #5f5650;
 }
 
 /* The main pane only, and never the picker miniature. Isolation keeps the
