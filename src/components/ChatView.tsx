@@ -110,7 +110,7 @@ import { effectivePlace, toolPlace, type EffectivePlace } from "@/lib/place";
 import { cn } from "@/lib/cn";
 import { activeLocale, t } from "@/lib/i18n";
 import { COMPACT_BUBBLE } from "@/lib/compact-chip";
-import { groupTranscript, isStatusActivity, turnDurations, workedLabel } from "@/lib/activity-runs";
+import { groupTranscript, isNarrationText, isStatusActivity, turnDurations, workedLabel } from "@/lib/activity-runs";
 import { StatusActivityRow } from "@/components/StatusActivityRow";
 import { CancelledTurnRow } from "./CancelledTurnRow";
 import { ActivityRun } from "./ActivityRun";
@@ -330,6 +330,7 @@ const Bubble = memo(function Bubble({
   joinAbove = false,
   joinBelow = false,
   workedFor,
+  narration = false,
   editing,
   pinned,
   versions,
@@ -348,6 +349,8 @@ const Bubble = memo(function Bubble({
   joinBelow?: boolean;
   /** Simple mode: how long the turn this answer ends took, for its tooltip. */
   workedFor?: number;
+  /** Manager (0017): an intermediate note of a settled turn — no fill, so it melts into the chat. */
+  narration?: boolean;
   editing: boolean;
   pinned: boolean;
   versions?: readonly Message[];
@@ -481,9 +484,11 @@ const Bubble = memo(function Bubble({
                 ? cn("text-ink", simple && SIMPLE_BUBBLE_TEXT)
                 : user
                   ? cn("whitespace-pre-wrap text-ink", simple ? SIMPLE_USER_BUBBLE : "bg-bubble-user px-4 py-2.5")
-                  : formatted
-                    ? cn(formattedReplyWidth(text), "rounded-2xl bg-card px-4 py-2.5 text-ink")
-                    : simple ? SIMPLE_BOT_BUBBLE : "bg-card px-4 py-2.5 text-ink",
+                  : narration
+                    ? cn("rounded-2xl px-4 py-2.5 text-ink")
+                    : formatted
+                      ? cn(formattedReplyWidth(text), "rounded-2xl bg-card px-4 py-2.5 text-ink")
+                      : simple ? SIMPLE_BOT_BUBBLE : "bg-card px-4 py-2.5 text-ink",
             simple && join && !split && !attachmentsOnly && !tabled && joinedCorners(user ? "end" : "start", join),
           )}
           title={workedFor === undefined ? new Date(message.at).toLocaleString() : `${workedLabel(workedFor)} · ${new Date(message.at).toLocaleString()}`}
@@ -795,6 +800,7 @@ const MessagesList = memo(function MessagesList({
               return (
                 <Bubble
                   message={m}
+                  narration={isNarrationText(m)}
                   emerging={m.id === emergingId}
                   eagerAttachments={m.id === newestMessageId || m.id === newestUserMessageId}
                   joinAbove={joins?.[i]?.above}

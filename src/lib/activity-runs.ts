@@ -45,6 +45,11 @@ type TurnFold = Extract<TranscriptItem, { kind: "turn" }>;
 const isNarration = (message: Message, turnId: string) =>
   message.role === "bot" && message.kind === "text" && message.turnId === turnId && !message.turnTerminal;
 
+/** A bot's intermediate note inside a still-open turn (not its final answer): what it says to itself while it works. */
+export function isNarrationText(message: Message): boolean {
+  return message.role === "bot" && message.kind === "text" && Boolean(message.turnId) && !message.turnTerminal;
+}
+
 /** A turn starts with the person's last message before its first row, or with that row when nobody wrote first. */
 function turnStartedAt(messages: readonly Message[], firstIndex: number, fallback: number): number {
   for (let i = firstIndex - 1; i >= 0; i -= 1) if (messages[i]!.role === "user") return messages[i]!.at;

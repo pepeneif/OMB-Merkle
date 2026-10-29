@@ -66,7 +66,7 @@ import { GroupCallOverlay } from "./GroupCallView";
 import { ApprovalCard } from "./ApprovalCard";
 import { QuestionCard } from "./QuestionCard";
 import { ManageMembersPanel } from "./ManageMembersPanel";
-import { groupActivityRuns, isStatusActivity, roomTurnFolds } from "@/lib/activity-runs";
+import { groupActivityRuns, isNarrationText, isStatusActivity, roomTurnFolds } from "@/lib/activity-runs";
 import { TurnNarrationRun } from "./TurnNarrationRun";
 import { ActivityRun } from "./ActivityRun";
 import { cn } from "@/lib/cn";
@@ -144,6 +144,7 @@ function RoomTextMessage({
   transcript,
   emerging,
   eager,
+  narration = false,
   onReply,
   canReact,
 }: {
@@ -153,6 +154,8 @@ function RoomTextMessage({
   transcript: Message[];
   emerging: boolean;
   eager: boolean;
+  /** Manager (0017): an intermediate note — no fill, so it melts into the chat. */
+  narration?: boolean;
   onReply: (message: Message) => void;
   canReact: boolean;
 }) {
@@ -218,11 +221,13 @@ function RoomTextMessage({
             !user && emerging && "turn-answer",
             tabled || (!user && !m.text?.trim() && !m.replyToId && m.attachments?.length)
               ? "text-ink"
-              : !simple && !user && isFormattedReply(m.text ?? "")
-                ? cn(formattedReplyWidth(m.text ?? ""), "rounded-2xl bg-card px-4 py-2.5 text-ink")
-                : user
-                  ? cn("chat-text whitespace-pre-wrap text-ink", simple ? SIMPLE_USER_BUBBLE : "bg-bubble-user px-4 py-2.5")
-                  : simple ? SIMPLE_BOT_BUBBLE : "bg-card px-4 py-2.5 text-ink",
+              : narration
+                ? "rounded-2xl px-4 py-2.5 text-ink"
+                : !simple && !user && isFormattedReply(m.text ?? "")
+                  ? cn(formattedReplyWidth(m.text ?? ""), "rounded-2xl bg-card px-4 py-2.5 text-ink")
+                  : user
+                    ? cn("chat-text whitespace-pre-wrap text-ink", simple ? SIMPLE_USER_BUBBLE : "bg-bubble-user px-4 py-2.5")
+                    : simple ? SIMPLE_BOT_BUBBLE : "bg-card px-4 py-2.5 text-ink",
           )}
           title={new Date(m.at).toLocaleString()}
         >
@@ -511,6 +516,7 @@ export const Transcript = memo(function Transcript({
                       transcript={transcript}
                       emerging={false}
                       eager={false}
+                      narration={isNarrationText(note)}
                       onReply={onReply}
                       canReact={canReact}
                     />
