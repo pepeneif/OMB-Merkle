@@ -13,8 +13,11 @@ export function SidebarBotRole({ role }: { role: string }) {
 }
 
 export function ChatHeadRole({ bot }: { bot: Pick<Bot, "title" | "chiefOfStaff"> }) {
+  // 0021 (D2): el rol del chat se omite para todos los bots menos el Chief of Staff,
+  // que es quien ya lo lleva en la barra lateral. Jose lo pidio asi el 2026-10-30.
+  if (!bot.chiefOfStaff) return null;
   const role = bot.title.trim();
-  const repeatsChiefBadge = bot.chiefOfStaff && role.toLocaleLowerCase() === t("chat.chiefOfStaff").toLocaleLowerCase();
+  const repeatsChiefBadge = role.toLocaleLowerCase() === t("chat.chiefOfStaff").toLocaleLowerCase();
   if (!role || repeatsChiefBadge) return null;
   return (
     <span data-chathead-role className="flex min-w-0 max-w-fit grow basis-0">

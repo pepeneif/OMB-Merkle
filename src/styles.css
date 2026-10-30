@@ -343,7 +343,7 @@
   --color-accent-text: #96551f;   /* for links on a light ground — 5.81:1 */
   --color-focus: #96551f;         /* the ring rides the accent, not Grok blue */
   --color-accent-ink: #ffffff;
-  --color-bubble-user: #f2e9dc;   /* your own messages in the badge beige */
+  --color-bubble-user: #f4ede4;   /* 0023 (D6): a la mitad entre el beige anterior (#f2e9dc) y el fondo app (#f5f1eb) */
   --color-bubble-user-ink: #1a1a18;   /* = ink: unchanged */
 
   --color-success: #3f6b47;
@@ -1521,7 +1521,8 @@ body {
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background: color-mix(in srgb, var(--glass-tint, var(--color-panel)) 55%, transparent);
+  /* 0020 (D1): barra superior menos transparente a pedido de Jose (55% -> 80%). */
+  background: color-mix(in srgb, var(--glass-tint, var(--color-panel)) 80%, transparent);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
   backdrop-filter: blur(24px) saturate(180%);
 }
