@@ -257,6 +257,22 @@ describe("math rendering", () => {
     expect(html.match(/class="katex"/g)).toHaveLength(1);
   });
 
+  it("renders --texto-- as a strikethrough in the person's own messages", () => {
+    const html = renderToStaticMarkup(createElement(ChatMarkdown, { text: "hola --tachado-- fin", underline: true }));
+    expect(html).toContain("<s");
+    expect(html).toContain("tachado");
+    expect(html).not.toContain("--tachado--");
+  });
+
+  it("keeps double-tilde as the spoiler and leaves shell flags alone", () => {
+    const spoiler = renderToStaticMarkup(createElement(ChatMarkdown, { text: "~~oculto~~", underline: true }));
+    expect(spoiler).toContain("aria-label=\"Reveal spoiler\"");
+    // A `--flag` with no closing pair must stay literal, not become a strikethrough.
+    const flag = renderToStaticMarkup(createElement(ChatMarkdown, { text: "docker run --rm -it", underline: true }));
+    expect(flag).toContain("--rm");
+    expect(flag).not.toContain("<s");
+  });
+
   it("resets white-space inside a markdown body so one newline stays one line", () => {
     // A newline inside a paragraph renders as <br> followed by a literal "\n" in the
     // HTML. The user bubble sets white-space: pre-wrap, which would paint that literal

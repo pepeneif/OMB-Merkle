@@ -38,6 +38,43 @@ export function remarkUnderline() {
   };
 }
 
+/** Personalizacion Manager (0028 / A3): tachado con `--texto--`.
+ *  Un plugin local, sin dependencias extra: sustituye en los nodos de texto las
+ *  corridas `--x--` por un nodo que se pinta como <s> (tachado). Es conservador a
+ *  proposito, para no romper banderas de shell ni rangos con guiones: la apertura
+ *  va tras inicio/espacio/puntuacion y pegada a texto, el cierre va precedido de
+ *  texto y seguido de fin/espacio/puntuacion, y el interior no lleva saltos de
+ *  linea ni otro `--`. Solo se aplica a los mensajes del usuario (A3), asi que las
+ *  salidas de herramientas de los bots no se tocan. */
+const STRIKE = /(^|[\s([{>"'«“¿¡])--(?=[^\s-])((?:(?!--)[^\n])*?[^\s-])--(?=$|[\s)\]}>"'»”.,;:!?…])/;
+export function remarkStrike() {
+  return (tree: MdNode) => {
+    const walk = (node: MdNode) => {
+      if (!node.children) return;
+      if (["link", "linkReference", "code", "inlineCode"].includes(node.type)) return;
+      node.children = node.children.flatMap((child) => {
+        if (child.type !== "text" || !child.value) { walk(child); return [child]; }
+        const value = child.value;
+        if (!value.includes("--")) return [child];
+        const out: MdNode[] = [];
+        let rest = value;
+        while (rest) {
+          const m = STRIKE.exec(rest);
+          if (!m) { out.push({ type: "text", value: rest }); break; }
+          const lead = m[1] ?? "";
+          const inner = m[2] ?? "";
+          const start = m.index + lead.length;
+          if (start > 0) out.push({ type: "text", value: rest.slice(0, start) });
+          if (inner) out.push({ type: "strike", data: { hName: "s" }, children: [{ type: "text", value: inner }] });
+          rest = rest.slice(m.index + m[0].length);
+        }
+        return out.length ? out : [child];
+      });
+    };
+    walk(tree);
+  };
+}
+
 /** Personalizacion Manager (0026 / A3): conserva los saltos de linea del texto del
  *  usuario dentro de un parrafo (como `remark-breaks`), sin dependencia externa:
  *  cada `\n` se vuelve un nodo `break` que se pinta como <br>. */
@@ -69,6 +106,7 @@ export type { Message };
  *  literal (conserva la direccion por linea via `.chat-text`); si si, se renderiza. */
 export function userTextHasMarkdown(text: string): boolean {
   if (text.includes("**") || text.includes("__") || text.includes("`") || text.includes("~~") || text.includes("++")) return true;
+  if (STRIKE.test(text)) return true;
   if (/^\s*(?:[-*+]|\d{1,3}[.)])\s+\S/m.test(text)) return true;
   if (/^\s*#{1,6}\s+\S/m.test(text)) return true;
   if (/\]\([^)\s]+\)/.test(text)) return true;

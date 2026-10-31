@@ -10,7 +10,7 @@ import { t } from "@/lib/i18n";
 import { cn } from "@/lib/cn";
 import { useAdvancedMode } from "@/lib/interface-mode";
 import { remarkMentions, sameMentionPerson, type MentionPeer, type MentionPerson } from "@/lib/mentions";
-import { remarkHardBreaks, remarkUnderline } from "@/lib/remark-user-format";
+import { remarkHardBreaks, remarkStrike, remarkUnderline } from "@/lib/remark-user-format";
 
 import { parseFenceInfo } from "../lib/code-block";
 import { markdownImageName, markdownImageOpenUrl } from "../lib/markdown-image";
@@ -686,6 +686,10 @@ const MARKDOWN_COMPONENTS: Components = {
   del({ children }: { children?: ReactNode }) {
     return <Spoiler>{children}</Spoiler>;
   },
+  // A3 (0028): `--texto--` en los mensajes del usuario se pinta como tachado.
+  s({ children }: { children?: ReactNode }) {
+    return <s className="text-ink-secondary line-through decoration-ink-secondary/50">{children}</s>;
+  },
   hr() {
     return <hr className="border-hairline/40" />;
   },
@@ -724,7 +728,7 @@ function ChatMarkdownComponent({ text, message, mentionPeers = NO_MENTION_PEERS,
     <MessageScopeContext.Provider value={{ message, imageOffsets, threads, currentBotId, delivered }}>
       <div className="chat-md min-w-0 [&>*+*]:mt-2">
         <Markdown
-          remarkPlugins={[...(underline ? [remarkUnderline] : []), ...(hardBreaks ? [remarkHardBreaks] : []), remarkGfm, remarkMath, remarkWindowsPathDestinations, unwrapLinkedImages, remarkGithubRefs, [remarkMentions, { peers: mentionPeers, everyone, person: mentionPerson }], remarkThreadRefs(threads, currentBotId)]}
+          remarkPlugins={[...(underline ? [remarkUnderline, remarkStrike] : []), ...(hardBreaks ? [remarkHardBreaks] : []), remarkGfm, remarkMath, remarkWindowsPathDestinations, unwrapLinkedImages, remarkGithubRefs, [remarkMentions, { peers: mentionPeers, everyone, person: mentionPerson }], remarkThreadRefs(threads, currentBotId)]}
           rehypePlugins={mathPlugin ? [mathPlugin] : []}
           urlTransform={chatUrlTransform}
           components={MARKDOWN_COMPONENTS}
