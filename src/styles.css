@@ -1066,6 +1066,14 @@
   line-height: 1.75;
   font-family: "omb-chat", var(--font-sans);
 }
+/* A markdown body makes its own line breaks (one per paragraph, plus an explicit
+   <br> for each newline inside a paragraph), so it must not inherit the user
+   bubble's white-space: pre-wrap: the renderer also emits a literal newline
+   right after that <br>, which pre-wrap would paint as a second, empty line.
+   Plain text (ThreadRefText) keeps the pre-wrap from its bubble. */
+.chat-md {
+  white-space: normal;
+}
 .chat-md :is(strong, b) {
   font-weight: 600;
 }

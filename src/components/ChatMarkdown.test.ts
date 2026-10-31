@@ -257,6 +257,17 @@ describe("math rendering", () => {
     expect(html.match(/class="katex"/g)).toHaveLength(1);
   });
 
+  it("resets white-space inside a markdown body so one newline stays one line", () => {
+    // A newline inside a paragraph renders as <br> followed by a literal "\n" in the
+    // HTML. The user bubble sets white-space: pre-wrap, which would paint that literal
+    // newline as a second, empty line; .chat-md must opt out so one Enter is one line.
+    const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../styles.css"), "utf8");
+    const rule = css.match(/\.chat-md \{[^}]*white-space: normal;[^}]*\}/)?.[0];
+    expect(rule).toBeDefined();
+    const html = renderToStaticMarkup(createElement(ChatMarkdown, { text: "uno\ndos", hardBreaks: true }));
+    expect(html.match(/<br\/>/g)).toHaveLength(1);
+  });
+
   it("contains long inline formulas in a horizontal scroll container", () => {
     const html = renderToStaticMarkup(createElement(ChatMarkdown, {
       text: `Inline $${"abcdefghijklmnopqrstuvwxyz".repeat(3)}$.`,
