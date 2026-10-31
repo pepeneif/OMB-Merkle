@@ -98,6 +98,8 @@ describe("narration (A4 corregido)", () => {
       expect(ack).toBeTruthy();
       expect([...ack!.classList]).not.toContain("bg-card");
       expect([...ack!.classList]).toContain("text-[13px]");
+      expect([...ack!.classList]).toContain("py-[5px]");
+      expect([...ack!.classList]).not.toContain("py-2.5");
       // La respuesta final (terminal) conserva su burbuja con relleno y su tamano.
       const answer = bubbles.find((b) => (b.textContent ?? "").includes("Fathom, Fireflies and Granola"));
       expect(answer).toBeTruthy();
