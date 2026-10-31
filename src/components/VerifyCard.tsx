@@ -1,10 +1,11 @@
 import { BookmarkPlus, CheckCircle2, ChevronDown, ChevronUp, Circle, ListChecks, Loader2, X, XCircle } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
 import { runSummary, type RunSkill, type RunStep } from "@/lib/verify-steps";
 import { BubbleResizeHandle } from "./BubbleResizeHandle";
+import { runCardCollapsed, setRunCardCollapsed } from "@/lib/run-open-state";
 
 function StatusIcon({ status }: { status: RunStep["status"] }) {
   const className = "size-4 shrink-0";
@@ -29,16 +30,32 @@ export function VerifyCard({
   skill,
   onDismiss,
   onSave,
+  storeKey,
 }: {
   steps: RunStep[];
   canSave: boolean;
   skill: RunSkill;
   onDismiss: () => void;
   onSave: () => void;
+  /** A7: llave estable del hilo para recordar el colapso entre reaperturas. */
+  storeKey: string;
 }) {
+  // 0027 (A7): recuerda si el usuario colapso el cuadro; una vez colapsado se queda
+  // colapsado (aunque lleguen actividades nuevas) y solo se reabre con su clic.
   const defaultCollapsed = steps.length > 6;
-  const [collapsed, setCollapsed] = useState(defaultCollapsed);
+  const [collapsed, setCollapsed] = useState(() => runCardCollapsed(storeKey) ?? defaultCollapsed);
+  useEffect(() => {
+    const saved = runCardCollapsed(storeKey);
+    if (saved !== undefined) setCollapsed(saved);
+  }, [storeKey]);
   if (steps.length === 0) return null;
+  const toggle = () => {
+    setCollapsed((current) => {
+      const next = !current;
+      setRunCardCollapsed(storeKey, next);
+      return next;
+    });
+  };
   const toggleLabel = collapsed ? t("chat.verify.expand") : t("chat.verify.collapse");
   return (
     <section
@@ -55,7 +72,7 @@ export function VerifyCard({
         </div>
         <button
           type="button"
-          onClick={() => setCollapsed((current) => !current)}
+          onClick={toggle}
           aria-expanded={!collapsed}
           aria-label={toggleLabel}
           title={toggleLabel}

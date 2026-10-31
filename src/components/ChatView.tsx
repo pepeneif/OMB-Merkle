@@ -483,7 +483,7 @@ const Bubble = memo(function Bubble({
                 : user
                   ? cn("whitespace-pre-wrap text-ink", simple ? SIMPLE_USER_BUBBLE : "bg-bubble-user px-4 py-2.5")
                   : narration
-                    ? cn("rounded-2xl px-4 py-2.5 text-ink")
+                    ? cn(formatted ? formattedReplyWidth(text) : "", "rounded-2xl bg-card px-4 py-2.5 text-ink")
                     : formatted
                       ? cn(formattedReplyWidth(text), "rounded-2xl bg-card px-4 py-2.5 text-ink")
                       : simple ? SIMPLE_BOT_BUBBLE : "bg-card px-4 py-2.5 text-ink",
@@ -529,7 +529,7 @@ const Bubble = memo(function Bubble({
                   data-citation-owner={botId}
                   data-citation-thread={threadId}
                 >
-                  <ThreadRefText text={visibleText} peers={mentionPeers} />
+                  <ChatMarkdown text={visibleText} mentionPeers={mentionPeers} mentionPerson={mentionPerson} underline hardBreaks message={{ threadId, messageId: message.id }} />
                 </div>
               )}
               {cited && <SentCitations
@@ -1248,6 +1248,7 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
         <div className="flex justify-end px-2 pb-2">
           <VerifyCard
             key={transcriptKey}
+            storeKey={`${bot.id}:${bot.threadId}:run`}
             steps={recordedRun}
             canSave={canSaveRun}
             skill={runSkill(messages, recordedRun)}

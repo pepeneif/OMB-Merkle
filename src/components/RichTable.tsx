@@ -45,7 +45,9 @@ export function TableDialog({ title, onClose, children, returnFocus }: { title: 
   );
 }
 
-const SMALL_TABLE_ROWS = 8;
+// 0024 (A8): sin umbral — la barra de busqueda de las tablas se muestra SIEMPRE
+// (como en v0.1.107), sin importar cuantas filas tenga la tabla. Jose, 2026-10-31.
+const SMALL_TABLE_ROWS = 0;
 
 /** Simple mode's table card: the composer surface with a hairline edge and no footer. Its header row starts at the
  * top; the hover plate floats over the header's right end and takes no room. Only touch screens, where the plate is

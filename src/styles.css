@@ -343,7 +343,7 @@
   --color-accent-text: #96551f;   /* for links on a light ground — 5.81:1 */
   --color-focus: #96551f;         /* the ring rides the accent, not Grok blue */
   --color-accent-ink: #ffffff;
-  --color-bubble-user: #f4ede4;   /* 0023 (D6): a la mitad entre el beige anterior (#f2e9dc) y el fondo app (#f5f1eb) */
+  --color-bubble-user: #ffffff;   /* 0025 (A6): BLANCO, igual que la burbuja del agente (#ffffff = --color-card) */
   --color-bubble-user-ink: #1a1a18;   /* = ink: unchanged */
 
   --color-success: #3f6b47;
@@ -1521,17 +1521,18 @@ body {
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  /* 0020 (D1): barra superior menos transparente a pedido de Jose (55% -> 80%). */
-  background: color-mix(in srgb, var(--glass-tint, var(--color-panel)) 80%, transparent);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  backdrop-filter: blur(24px) saturate(180%);
+  /* 0024 (A1): la barra superior va SOLIDA, sin transparencia ni efecto vidrio (Jose, 2026-10-31). */
+  background: var(--glass-tint, var(--color-panel));
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 .glass-bar[data-glass-bar="top"]::before {
-  mask-image: linear-gradient(to bottom, black calc(100% - var(--glass-edge)), transparent);
+  /* 0024 (A1): sin mascara; la barra es un bloque solido. */
+  mask-image: none;
 }
 .glass-bar[data-glass-bar="bottom"]::before {
   top: calc(-1 * var(--glass-reach, 0px));
-  mask-image: linear-gradient(to top, black calc(100% - var(--glass-reach, 0px)), transparent);
+  mask-image: none;
 }
 /* A fading bar has no tint and no blur. What scrolls under it fades straight into the canvas: hidden
    at the window edge, back to full strength over the last --glass-fade of the bar, which is the whole
@@ -1540,7 +1541,8 @@ body {
   --glass-fade: 60px;
 }
 .glass-bar[data-glass-fade]::before {
-  background: linear-gradient(to bottom, var(--color-app), var(--color-app) calc(100% - var(--glass-fade)), transparent);
+  /* 0024 (A1): sin degradado; color de la app solido. */
+  background: var(--color-app);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   mask-image: none;

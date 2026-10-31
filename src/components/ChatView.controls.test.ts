@@ -215,14 +215,9 @@ describe("header name", () => {
     fixture.advanced = true;
   });
 
-  it("draws the Chief's role beside the name, taking only the room the name leaves", () => {
+  it("draws no role beside the name for anyone, the Chief of Staff included (personalizacion Manager 0024 / A2)", () => {
     const markup = renderToStaticMarkup(createElement(ChatView, { bot: { ...bot, chiefOfStaff: true, title: " Research " } }));
-    const identity = markup.slice(markup.indexOf("data-chathead-identity"), markup.indexOf("data-chathead-controls"));
-    const role = identity.match(/<span data-chathead-role="true" class="([^"]*)"><span title="Research" class="([^"]*)">Research<\/span><\/span>/);
-    expect(role).toBeTruthy();
-    expect(role![1].split(" ")).toEqual(expect.arrayContaining(["min-w-0", "max-w-fit", "grow", "basis-0"]));
-    expect(role![2].split(" ")).toEqual(expect.arrayContaining(["truncate", "text-[13px]", "text-ink-secondary"]));
-    expect(identity.indexOf("data-chathead-role")).toBeGreaterThan(identity.indexOf("Rename Pepper"));
+    expect(markup).not.toContain("data-chathead-role");
     expect(renderToStaticMarkup(createElement(ChatView, { bot: { ...bot, chiefOfStaff: true, title: "chief of staff " } }))).not.toContain("data-chathead-role");
   });
 

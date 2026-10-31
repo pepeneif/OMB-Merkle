@@ -256,7 +256,7 @@ function RoomTextMessage({
                 data-citation-owner={group.id}
                 data-citation-thread={group.threadId}
               >
-                <ThreadRefText text={display} peers={peers} everyone={!group.dm} />
+                <ChatMarkdown text={display} mentionPeers={peers} everyone={!group.dm} mentionPerson={{ profileName: state.config?.profile?.name }} underline hardBreaks message={{ threadId: group.threadId, messageId: m.id }} />
               </div>
               {cited && <SentCitations
                 citations={cited.citations}
