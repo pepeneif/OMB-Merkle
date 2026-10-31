@@ -60,6 +60,7 @@ import { lastNonReceipt } from "@/lib/receipts";
 import { turnNowPhrases } from "@/lib/live-activity"; import { useTurnLive } from "@/state/turn-status";
 import { friendlyNowPhrases } from "@/lib/friendly-activity";
 import { ChatMarkdown } from "./ChatMarkdown";
+import { userTextHasMarkdown } from "@/lib/remark-user-format";
 import { liveToolIds } from "@/lib/tool-liveness";
 import { VoiceNoteBubble, type VoiceNoteAttachment } from "./VoiceNoteBubble";
 import { RawMarkdownView, RawToggleAction } from "./RawMarkdownToggle";
@@ -529,7 +530,9 @@ const Bubble = memo(function Bubble({
                   data-citation-owner={botId}
                   data-citation-thread={threadId}
                 >
-                  <ChatMarkdown text={visibleText} mentionPeers={mentionPeers} mentionPerson={mentionPerson} underline hardBreaks message={{ threadId, messageId: message.id }} />
+                  {userTextHasMarkdown(visibleText)
+                    ? <ChatMarkdown text={visibleText} mentionPeers={mentionPeers} mentionPerson={mentionPerson} underline hardBreaks message={{ threadId, messageId: message.id }} />
+                    : <ThreadRefText text={visibleText} peers={mentionPeers} />}
                 </div>
               )}
               {cited && <SentCitations

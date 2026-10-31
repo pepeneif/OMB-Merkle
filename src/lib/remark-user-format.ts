@@ -64,3 +64,15 @@ export function remarkHardBreaks() {
 }
 
 export type { Message };
+
+/** A3: ¿el mensaje del usuario trae formato de markdown? Si no, se pinta como texto
+ *  literal (conserva la direccion por linea via `.chat-text`); si si, se renderiza. */
+export function userTextHasMarkdown(text: string): boolean {
+  if (text.includes("**") || text.includes("__") || text.includes("`") || text.includes("~~") || text.includes("++")) return true;
+  if (/^\s*(?:[-*+]|\d{1,3}[.)])\s+\S/m.test(text)) return true;
+  if (/^\s*#{1,6}\s+\S/m.test(text)) return true;
+  if (/\]\([^)\s]+\)/.test(text)) return true;
+  if (/(^|[\s(])\*[^*\s][^*]*\*(?=[\s).,!?:;]|$)/.test(text)) return true;
+  if (/(^|[\s(])_[^_\s][^_]*_(?=[\s).,!?:;]|$)/.test(text)) return true;
+  return false;
+}

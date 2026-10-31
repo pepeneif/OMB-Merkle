@@ -30,6 +30,7 @@ import { normalizeState } from "@/lib/mascot";
 import { botTextShowsSpeaker, laterTextOwns, runShowsSpeaker } from "@/lib/room-speaker";
 import { defaultResponderName, groupResponseHint, jevRoomRoutingOn } from "@/lib/group-routing";
 import { ChatMarkdown } from "./ChatMarkdown";
+import { userTextHasMarkdown } from "@/lib/remark-user-format";
 import { FailedTurnRow, MessageBoundary } from "./ChatView";
 import { SIMPLE_BOT_BUBBLE, SIMPLE_BUBBLE_MAX, SIMPLE_BUBBLE_TEXT, SIMPLE_USER_BUBBLE } from "./chat-bubble";
 import { ReplyBlocks } from "./ReplyBlocks";
@@ -256,7 +257,9 @@ function RoomTextMessage({
                 data-citation-owner={group.id}
                 data-citation-thread={group.threadId}
               >
-                <ChatMarkdown text={display} mentionPeers={peers} everyone={!group.dm} mentionPerson={{ profileName: state.config?.profile?.name }} underline hardBreaks message={{ threadId: group.threadId, messageId: m.id }} />
+                {userTextHasMarkdown(display)
+                  ? <ChatMarkdown text={display} mentionPeers={peers} everyone={!group.dm} mentionPerson={{ profileName: state.config?.profile?.name }} underline hardBreaks message={{ threadId: group.threadId, messageId: m.id }} />
+                  : <ThreadRefText text={display} peers={peers} everyone={!group.dm} />}
               </div>
               {cited && <SentCitations
                 citations={cited.citations}
