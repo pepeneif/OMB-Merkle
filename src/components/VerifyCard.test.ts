@@ -14,7 +14,7 @@ const steps: RunStep[] = [
 const TAG = `>${t("chat.verify.verifiedTag")}<`;
 const noop = () => undefined;
 const render = (props: Partial<Parameters<typeof VerifyCard>[0]> = {}) =>
-  renderToStaticMarkup(createElement(VerifyCard, { steps, canSave: true, skill: null, onDismiss: noop, onSave: noop, ...props }));
+  renderToStaticMarkup(createElement(VerifyCard, { steps, canSave: true, skill: null, onDismiss: noop, onSave: noop, storeKey: "test:thread:run", ...props }));
 
 describe("VerifyCard", () => {
   it("renders nothing without steps", () => {

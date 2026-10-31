@@ -17,11 +17,6 @@ export function ChatHeadRole({ bot }: { bot: Pick<Bot, "title" | "chiefOfStaff">
   // Chief of Staff. Jose lo pidio asi el 2026-10-31.
   void bot;
   return null;
-  return (
-    <span data-chathead-role className="flex min-w-0 max-w-fit grow basis-0">
-      <span title={role} className="max-w-[16rem] truncate text-[13px] text-ink-secondary">{role}</span>
-    </span>
-  );
 }
 
 export function chiefOfStaffBadge(bot: Bot) {
