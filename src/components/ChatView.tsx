@@ -1251,7 +1251,6 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
         <div className="flex justify-end px-2 pb-2">
           <VerifyCard
             key={transcriptKey}
-            storeKey={`${bot.id}:${bot.threadId}:run`}
             steps={recordedRun}
             canSave={canSaveRun}
             skill={runSkill(messages, recordedRun)}
