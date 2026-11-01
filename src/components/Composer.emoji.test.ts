@@ -89,6 +89,21 @@ describe("the composer's emoji button", () => {
     expect(field.className.split(" ")).toContain("min-h-14");
   });
 
+  it("lays the left cluster out in two rows, approval and place above the goal chip", () => {
+    restoreComposerDraft(draftId, { text: "", attachments: [] });
+    flushSync(() => root.render(createElement(Composer, { bot })));
+    const attach = container.querySelector<HTMLButtonElement>('button[aria-label="Adjuntar un archivo"], button[aria-label="Attach a file"]')!;
+    const emoji = emojiButton()!;
+    // The cluster is a 2-row grid: attach sits on the bottom row's last column and the emoji
+    // picker directly above it, while the goal chip spans the first two columns of that row.
+    expect(attach.className).toContain("row-start-2");
+    expect(attach.className).toContain("col-start-3");
+    const emojiCell = emoji.parentElement!.parentElement!;
+    expect(emojiCell.className).toContain("row-start-1");
+    expect(emojiCell.className).toContain("col-start-3");
+    expect(emojiCell.parentElement!.className).toContain("grid-rows-2");
+  });
+
   it("keeps the emoji button out of Simple mode's round + composer", () => {
     fixture.advanced = false;
     restoreComposerDraft(draftId, { text: "", attachments: [] });

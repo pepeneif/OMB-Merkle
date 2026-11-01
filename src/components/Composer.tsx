@@ -850,34 +850,55 @@ export function Composer({
             }}
           />
           {!locked && !singleRow && (
-            <div className={cn("items-center gap-1", simpleDock
-              ? "flex shrink-0"
-              : "grid grid-flow-col grid-rows-2 justify-items-start @max-[30rem]/composer:flex @max-[30rem]/composer:flex-wrap")}>
-              {simpleDock && <ComposerPlusMenu onAttach={() => fileInput.current?.click()} goal={goal} teach={canLearn ? teachTask : undefined} />}
-              {advanced && <button
-                type="button"
-                onClick={() => fileInput.current?.click()}
-                aria-label={t("composer.attach")}
-                title={t("composer.attach")}
-                className="flex size-8 shrink-0 items-center justify-center rounded-full text-ink-secondary hover:bg-control hover:text-ink"
-              >
-                <Paperclip size={17} />
-              </button>}
-              {/* Simple mode shows a mode's chip only while it is on, so a choice made in the + menu or the bot panel stays in view. */}
-              {goal && (advanced || goal.on) && <GoalToggle {...goal} compact={simpleDock} />}
-              {advanced && approvalChoice && <ApprovalModeSelector {...approvalChoice} />}
-              {simpleDock && approvalChoice && profile && bot && approvalModeFor(bot) !== approvalModeFor(profile) && <ApprovalChip choice={approvalChoice} />}
-              {modeBot && !remoteClient && advanced && (
-                <PlaceChip
-                  bot={modeBot}
-                  task={composerTask}
-                  live={Boolean(modeBot.busy)}
-                  disabled={Boolean(modeBot.busy)}
-                  onPin={(surface) => dispatch({ type: "updateTask", botId: modeBot.id, threadId: modeBot.threadId, patch: { surface } })}
-                />
-              )}
-              {advanced && <ComposerEmoji onPick={insertEmoji} disabled={Boolean(approval) || locked} />}
-            </div>
+            simpleDock ? (
+              <div className="flex shrink-0 items-center gap-1">
+                <ComposerPlusMenu onAttach={() => fileInput.current?.click()} goal={goal} teach={canLearn ? teachTask : undefined} />
+                {/* Simple mode shows a mode's chip only while it is on, so a choice made in the + menu or the bot panel stays in view. */}
+                {goal && goal.on && <GoalToggle {...goal} compact />}
+                {approvalChoice && profile && bot && approvalModeFor(bot) !== approvalModeFor(profile) && <ApprovalChip choice={approvalChoice} />}
+              </div>
+            ) : (
+              /* Advanced mode's left cluster in two rows: the approval level and where the bot works on the top
+                 row, the room's goal chip with attach to its right on the bottom row, and the emoji picker above
+                 attach. On a narrow composer the row wraps as before, in the same order it always had. */
+              <div className="grid grid-cols-[auto_auto_auto] grid-rows-2 items-center justify-items-start gap-1 @max-[30rem]/composer:flex @max-[30rem]/composer:flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => fileInput.current?.click()}
+                  aria-label={t("composer.attach")}
+                  title={t("composer.attach")}
+                  className="col-start-3 row-start-2 flex size-8 shrink-0 items-center justify-center rounded-full text-ink-secondary hover:bg-control hover:text-ink"
+                >
+                  <Paperclip size={17} />
+                </button>
+                {goal && (
+                  <div className="col-span-2 col-start-1 row-start-2">
+                    <GoalToggle {...goal} />
+                  </div>
+                )}
+                {advanced && approvalChoice && (
+                  <div className="col-start-1 row-start-1">
+                    <ApprovalModeSelector {...approvalChoice} />
+                  </div>
+                )}
+                {modeBot && !remoteClient && advanced && (
+                  <div className="col-start-2 row-start-1">
+                    <PlaceChip
+                      bot={modeBot}
+                      task={composerTask}
+                      live={Boolean(modeBot.busy)}
+                      disabled={Boolean(modeBot.busy)}
+                      onPin={(surface) => dispatch({ type: "updateTask", botId: modeBot.id, threadId: modeBot.threadId, patch: { surface } })}
+                    />
+                  </div>
+                )}
+                {advanced && (
+                  <div className="col-start-3 row-start-1">
+                    <ComposerEmoji onPick={insertEmoji} disabled={Boolean(approval) || locked} />
+                  </div>
+                )}
+              </div>
+            )
           )}
           <MentionTextarea
           wrapperClassName={singleRow || simpleDock ? undefined : "@max-[30rem]/composer:order-first @max-[30rem]/composer:basis-full"}
