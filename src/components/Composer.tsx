@@ -32,6 +32,7 @@ import {
 import { DEVS_CHOICE, MentionMenu, teammateChoices, type MentionChoice } from "./MentionMenu"; import { useTeammates } from "@/state/team-people"; import { hiddenFromSidebar, useViewerEmail } from "@/lib/default-bot";
 import { SlashCommandMenu } from "./SlashCommandMenu";
 import { MentionTextarea } from "./MentionTextarea";
+import { ComposerEmoji } from "./ComposerEmoji";
 import { ComposerAttachments, pathForFile } from "./ComposerAttachments";
 import { PointedChips } from "./app/PointedChips"; import { SetupRequestChip, setupRequestPlaceholder } from "./SetupOffer";
 import { takePointedChips } from "@/lib/pointed-chips";
@@ -706,6 +707,27 @@ export function Composer({
     }
     setChannelMode((current) => current === "goal" ? "chat" : "goal");
   };
+  // NanoBot's emoji box: a chosen emoji lands at the caret and the field keeps it,
+  // instead of appending at the end. The mirror is untouched, so the caret stays put.
+  const insertEmoji = useCallback(
+    (emoji: string) => {
+      const input = inputRef.current;
+      const start = input?.selectionStart ?? caret;
+      const end = input?.selectionEnd ?? start;
+      const next = `${text.slice(0, start)}${emoji}${text.slice(end)}`;
+      editText(next);
+      const at = start + emoji.length;
+      setCaret(at);
+      requestAnimationFrame(() => {
+        const field = inputRef.current;
+        if (!field) return;
+        field.focus();
+        field.setSelectionRange(at, at);
+      });
+    },
+    [text, caret, editText],
+  );
+
   const goal = !group?.dm ? { on: effectiveChannelMode === "goal", onToggle: toggleGoal, solo: !group } : undefined;
 
   return (
@@ -828,7 +850,9 @@ export function Composer({
             }}
           />
           {!locked && !singleRow && (
-            <div className={cn("flex items-center gap-1", simpleDock ? "shrink-0" : "flex-wrap")}>
+            <div className={cn("items-center gap-1", simpleDock
+              ? "flex shrink-0"
+              : "grid grid-flow-col grid-rows-2 justify-items-start @max-[30rem]/composer:flex @max-[30rem]/composer:flex-wrap")}>
               {simpleDock && <ComposerPlusMenu onAttach={() => fileInput.current?.click()} goal={goal} teach={canLearn ? teachTask : undefined} />}
               {advanced && <button
                 type="button"
@@ -852,6 +876,7 @@ export function Composer({
                   onPin={(surface) => dispatch({ type: "updateTask", botId: modeBot.id, threadId: modeBot.threadId, patch: { surface } })}
                 />
               )}
+              {advanced && <ComposerEmoji onPick={insertEmoji} disabled={Boolean(approval) || locked} />}
             </div>
           )}
           <MentionTextarea
@@ -860,7 +885,7 @@ export function Composer({
           peers={[...(group ? members ?? [] : state.bots.filter((member) => member.id !== bot?.id)), ...teammates.peers]}
           everyone={Boolean(group && !group.dm)}
           dir="auto"
-          rows={1}
+          rows={2}
           value={text}
           onChange={(e) => {
             if (recording) stopDictation();
@@ -952,7 +977,7 @@ export function Composer({
               "block max-h-[9rem] w-full resize-none overflow-y-auto bg-transparent focus:outline-none",
               advanced ? "placeholder:text-ink-secondary" : "placeholder:text-ink-tertiary",
               !simpleDock && "px-1 text-[15px]",
-              simpleDock ? "min-h-7 px-0.5 py-1 text-[14px] leading-5" : "min-h-6 py-1 leading-6",
+              simpleDock ? "min-h-7 px-0.5 py-1 text-[14px] leading-5" : "min-h-14 py-1 leading-6",
             )}
           />
           <div data-composer-actions className={cn("flex items-center", simpleDock ? "gap-2" : "gap-1", !singleRow && !simpleDock && "@max-[30rem]/composer:ml-auto")}>

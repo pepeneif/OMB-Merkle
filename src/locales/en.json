@@ -6613,5 +6613,6 @@
   "chat.setupCard.data": "Data, spreadsheets and reports",
   "composer.setupRequest.placeholder": "Tell {name} what you'd like help with",
   "composer.setupRequest.waiting": "{name} is ready to be set up",
-  "composer.setupRequest.cancel": "Stop setting up {name}"
+  "composer.setupRequest.cancel": "Stop setting up {name}",
+  "composer.emoji": "Emoji"
 }

@@ -343,8 +343,8 @@ describe("thread control placement", () => {
     expect(editor).toEqual(expect.arrayContaining(["min-w-0", "flex-1", "@max-[30rem]/composer:order-first", "@max-[30rem]/composer:basis-full"]));
     expect(editor).not.toContain("basis-full");
     const textarea = /<textarea[^>]*class="([^"]*)"/.exec(markup)!.at(1)!.split(" ");
-    expect(textarea).toContain("min-h-6");
-    expect(textarea).not.toContain("min-h-14");
+    expect(textarea).toContain("min-h-14");
+    expect(textarea).not.toContain("min-h-6");
   });
 
   it("keeps the composer inert until the deleted thread's replacement transcript arrives", () => {
