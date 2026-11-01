@@ -27,3 +27,25 @@ it("draws its words in the field's own type and padding, so the caret stays at t
   expect([mirror().fontSize, mirror().lineHeight, mirror().paddingLeft], "and follows the field when its classes change").toEqual(["15px", "24px", "4px"]);
   act(() => root.unmount());
 });
+
+it("keeps the tail visible after the text grows, and keeps a mid-text caret where the reader is", async () => {
+  vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  const inputRef = createRef<HTMLTextAreaElement>();
+  const show = (value: string, className = "dock") => act(async () => {
+    root.render(createElement(MentionTextarea, { inputRef, peers: [], className, value, onChange: () => {} }));
+  });
+  await show("line");
+  const field = inputRef.current!;
+  Object.defineProperty(field, "scrollHeight", { configurable: true, get: () => 200 });
+  Object.defineProperty(field, "clientHeight", { configurable: true, get: () => 100 });
+  field.scrollTop = 0;
+  field.selectionStart = field.selectionEnd = field.value.length;
+  await show("line\nline\nline\nline\nline\n263PAYLk3t3cV2ve3zkga7Hw7s6cVA1C1Hkj4J46oJsP");
+  expect(field.scrollTop, "a paste that grows the box follows the caret instead of keeping the old top").toBe(100);
+  field.scrollTop = 30;
+  field.selectionStart = field.selectionEnd = 0;
+  await show(field.value, "dock wide");
+  expect(field.scrollTop, "a reader parked mid-text keeps their place when the box is re-measured").toBe(30);
+  act(() => root.unmount());
+});

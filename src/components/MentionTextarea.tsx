@@ -20,7 +20,7 @@ export function MentionTextarea({ inputRef, peers, everyone = false, wrapperClas
     const style = getComputedStyle(input);
     for (const property of TEXT_LAYOUT) mirror.style.setProperty(property, style.getPropertyValue(property));
     mirror.style.width = `${input.clientWidth}px`;
-    mirror.scrollTop = input.scrollTop;
+    mirror.scrollTop = Math.min(input.scrollTop, Math.max(0, mirror.scrollHeight - mirror.clientHeight));
     mirror.scrollLeft = input.scrollLeft;
   }, [inputRef]);
   const resize = useCallback(() => {
@@ -30,7 +30,12 @@ export function MentionTextarea({ inputRef, peers, everyone = false, wrapperClas
     const line = parseFloat(getComputedStyle(input).lineHeight) || 24;
     input.style.height = "auto";
     input.style.height = `${Math.min(input.scrollHeight, line * 6)}px`;
-    input.scrollTop = scrollTop;
+    // A stale scrollTop hides the tail: after a paste (or any growth) the field
+    // keeps its old top and the caret sits below the visible box. When the caret
+    // is at the end, follow it; otherwise keep the reader's position, clamped.
+    const maxScrollTop = Math.max(0, input.scrollHeight - input.clientHeight);
+    const atEnd = input.selectionStart === input.selectionEnd && input.selectionEnd === input.value.length;
+    input.scrollTop = atEnd ? maxScrollTop : Math.min(scrollTop, maxScrollTop);
     sync();
   }, [inputRef, sync]);
   useLayoutEffect(resize, [props.value, props.className, resize]);
