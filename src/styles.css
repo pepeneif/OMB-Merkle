@@ -3596,6 +3596,12 @@ button:disabled.bg-danger {
   --color-ink-secondary: #6b6559 !important;
   --color-ink-tertiary: #6d685c !important;
   --color-bubble-user-ink: #1a1a18 !important;
+  /* The tone's own link colour is picked against its coloured fill, so on the forced white it all but vanishes
+     (a bare URL read as blank). White needs Atelier's link tone, the one the skin measured on white. */
+  --color-accent: #a05f25 !important;
+  --color-accent-text: #96551f !important;
+  --color-accent-border: #b06a2c !important;
+  --color-focus: #96551f !important;
   --bubble-selection: #d9d2c6 !important;
   --bubble-selection-ink: #1a1a18 !important;
 }

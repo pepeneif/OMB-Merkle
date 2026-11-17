@@ -42,8 +42,13 @@ export type { Message };
 
 /** A3: ¿el mensaje del usuario trae formato de markdown? Si no, se pinta como texto
  *  literal (conserva la direccion por linea via `.chat-text`); si si, se renderiza. */
+/** A web address written as-is ("https://…", "http://…", "www.…"): the person's own text becomes Markdown so the
+ *  address is drawn as a link, and the link opens in a new window. */
+const BARE_URL = /(?:https?:\/\/|www\.)[^\s<>()[\]`]+\.[^\s<>()[\]`]*/i;
+
 export function userTextHasMarkdown(text: string): boolean {
   if (text.includes("**") || text.includes("__") || text.includes("`") || text.includes("~~") || text.includes("++")) return true;
+  if (BARE_URL.test(text)) return true;
   if (/^\s*(?:[-*+]|\d{1,3}[.)])\s+\S/m.test(text)) return true;
   if (/^\s*#{1,6}\s+\S/m.test(text)) return true;
   if (/\]\([^)\s]+\)/.test(text)) return true;
