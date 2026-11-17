@@ -344,3 +344,32 @@ Arreglo:
 
 Verificado: escritorio de alfa `env=a8ff433b… layer=9 running`; produccion
 (`omb-prod-omb-1` y su escritorio `…-83dd946e8eb8`) sin tocar; `beta` y `alfa` en 200.
+
+### Parche 014 — el modelo de fondo eligió un modelo de imagen (2026-11-17)
+
+Tras el corte a la v165 empezaron a salir llamadas a `google/gemini-nano-banana-2.1` con la llave
+de OpenRouter, sin que ningún bot lo tuviera seleccionado. El selector de «modelo chico» de la 165
+reconoce el modelo por nombre (`/[-.](?:luna|mini|nano)[-.]/`) y `nano-banana` califica como
+pequeño, así que el motor lo eligió para todas las tareas de fondo (hilo `memory-…`): 44 llamadas,
+397,090 tokens de entrada y 152,603 de salida. El registro local guarda `costUsd: null` para esas
+llamadas, así que no aparecían en nuestros totales; nano-banana cobra por imagen, no por token.
+
+El parche 014 (`patches/014-v165-fondo-sin-modelos-de-imagen.patch`):
+
+- Añade `server/model-kinds.ts` con `isImageModel()`, que reconoce `nano-banana`, `dall-e`/`dalle`,
+  `flux`, `stable-diffusion`, `sdxl`, `imagen`, `ideogram`, `recraft`, `seedream`, `midjourney` e
+  `image`/`imagegen`/`text-to-image`.
+- Lo aplica en **los dos** selectores: `codexBackgroundModel()` (tareas de fondo) y `fastModelFor()`
+  (turno rápido). Un modelo de imagen ya no cuenta como modelo chico.
+- Añade el ancla `OMB_BACKGROUND_MODEL`: si el catálogo lista ese modelo en el mismo proveedor, se
+  usa tal cual. En los compose de alfa y beta va
+  `OMB_BACKGROUND_MODEL: deepseek/deepseek-v4.1-flash-1017`.
+- Pruebas nuevas: `server/drivers/background-model-selection.test.ts` (caso nano-banana colado como
+  modelo chico) y dos casos en `turn-route.test.ts`. 73 pruebas en verde y `tsc` limpio.
+
+Imagen `openmausbot:v0.1.165-r7` (`44d014e23df9`), desplegada en alfa y beta el 2026-11-17 12:04 y
+12:07 UTC. Rollback: `r6` (`8814dd0bf64c`).
+
+**Para el próximo upgrade:** el parche va dentro de la serie de la rama; después de cualquier
+upgrade, comprobar en el uso de OpenRouter que no haya llamadas a modelos de imagen desde el hilo
+`memory-…`. El detalle completo está en el expediente, documento `014-modelo-de-fondo-sin-imagenes`.

@@ -74,6 +74,19 @@ describe("fastModelFor", () => {
     expect(fastModelFor(claude, "claude-opus-5", new Set(["gpt-5.4-mini"]))).toBe("claude-haiku-4-5");
   });
 
+  it("never picks an image model that happens to carry a quick word", () => {
+    const openrouter: ModelCatalog = {
+      default: "openrouter::deepseek/deepseek-v4.1-pro",
+      options: [
+        { id: "openrouter::deepseek/deepseek-v4.1-pro", label: "DeepSeek V4.1 Pro", provider: "openrouter" },
+        { id: "openrouter::google/gemini-nano-banana-2.1", label: "google/gemini-nano-banana-2.1 (OpenRouter)", provider: "openrouter" },
+        { id: "openrouter::openai/gpt-5.4-mini", label: "GPT 5.4 Mini", provider: "openrouter" },
+      ],
+    };
+    expect(fastModelFor(openrouter, "openrouter::deepseek/deepseek-v4.1-pro")).toBe("openrouter::openai/gpt-5.4-mini");
+    expect(fastModelFor(openrouter, "openrouter::google/gemini-nano-banana-2.1")).toBe("openrouter::openai/gpt-5.4-mini");
+  });
+
   it("keeps a model that is already fast, and gives up without a catalog", () => {
     expect(fastModelFor(claude, "claude-haiku-4-5")).toBe("claude-haiku-4-5");
     expect(fastModelFor(undefined, "claude-opus-5")).toBeUndefined();

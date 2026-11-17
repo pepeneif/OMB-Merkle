@@ -1,0 +1,193 @@
+diff --git a/server/drivers/background-model-selection.test.ts b/server/drivers/background-model-selection.test.ts
+new file mode 100644
+index 000000000..d4bc07546
+--- /dev/null
++++ b/server/drivers/background-model-selection.test.ts
+@@ -0,0 +1,73 @@
++import { describe, expect, it } from "vitest";
++
++import type { ModelCatalog } from "../contracts.ts";
++import { codexBackgroundModel, codexBackgroundRoute, pinnedBackgroundModel } from "./codex-background-text.ts";
++import { isImageModel } from "../model-kinds.ts";
++
++const openrouter: ModelCatalog = {
++  default: "openrouter::deepseek/deepseek-v4.1-flash-1017",
++  options: [
++    { id: "openrouter::deepseek/deepseek-v4.1-flash-1017", label: "DeepSeek V4.1 Flash", provider: "openrouter" },
++    { id: "openrouter::google/gemini-nano-banana-2.1", label: "google/gemini-nano-banana-2.1 (OpenRouter)", provider: "openrouter" },
++    { id: "openrouter::openai/gpt-5.4-mini", label: "GPT 5.4 Mini", provider: "openrouter" },
++  ],
++};
++
++describe("isImageModel", () => {
++  it.each([
++    "openrouter::google/gemini-nano-banana-2.1",
++    "google/gemini-nano-banana-2.1 (OpenRouter)",
++    "google/nano-banana-pro",
++    "openai/gpt-image-1",
++    "black-forest-labs/flux-1.1-pro",
++    "stabilityai/stable-diffusion-3.5",
++  ])("recognises an image model: %s", (name) => {
++    expect(isImageModel(name)).toBe(true);
++  });
++
++  it.each(["openrouter::openai/gpt-5.4-mini", "anthropic/claude-haiku-5.5", "google/gemini-4-flash", "deepseek/deepseek-v4.1-flash-1017"])(
++    "leaves a text model alone: %s",
++    (name) => {
++      expect(isImageModel(name)).toBe(false);
++    },
++  );
++});
++
++describe("background model selection over OpenRouter", () => {
++  it("skips the image model whose name carries a quick word", () => {
++    expect(codexBackgroundModel(openrouter, new Set(), "openrouter")).toBe("openrouter::openai/gpt-5.4-mini");
++  });
++
++  it("returns nothing when every small-looking model draws pictures", () => {
++    const onlyImage: ModelCatalog = {
++      default: "openrouter::deepseek/deepseek-v4.1-flash-1017",
++      options: openrouter.options.filter((option) => !option.id.includes("mini")),
++    };
++    expect(codexBackgroundModel(onlyImage, new Set(), "openrouter")).toBeNull();
++  });
++});
++
++describe("pinned background model", () => {
++  it("takes the pin when the catalog lists it on the same provider", () => {
++    expect(pinnedBackgroundModel(openrouter, "deepseek/deepseek-v4.1-flash-1017", "openrouter")).toBe("openrouter::deepseek/deepseek-v4.1-flash-1017");
++    expect(pinnedBackgroundModel(openrouter, "openrouter::deepseek/deepseek-v4.1-flash-1017", "openrouter")).toBe("openrouter::deepseek/deepseek-v4.1-flash-1017");
++  });
++
++  it("ignores a pin the catalog does not list, or one on another provider", () => {
++    expect(pinnedBackgroundModel(openrouter, "nope/nope", "openrouter")).toBeNull();
++    expect(pinnedBackgroundModel(openrouter, "deepseek/deepseek-v4.1-flash-1017", "openai")).toBeNull();
++    expect(pinnedBackgroundModel(openrouter, undefined, "openrouter")).toBeNull();
++  });
++
++  it("uses the pin ahead of the small-model search", () => {
++    const previous = process.env.OMB_BACKGROUND_MODEL;
++    process.env.OMB_BACKGROUND_MODEL = "deepseek/deepseek-v4.1-flash-1017";
++    try {
++      expect(codexBackgroundRoute(openrouter, true, { model: "openrouter::deepseek/deepseek-v4.1-flash-1017" }))
++        .toEqual({ model: "openrouter::deepseek/deepseek-v4.1-flash-1017" });
++    } finally {
++      if (previous === undefined) delete process.env.OMB_BACKGROUND_MODEL;
++      else process.env.OMB_BACKGROUND_MODEL = previous;
++    }
++  });
++});
+diff --git a/server/drivers/codex-background-text.ts b/server/drivers/codex-background-text.ts
+index c31b3f832..8f92668a1 100644
+--- a/server/drivers/codex-background-text.ts
++++ b/server/drivers/codex-background-text.ts
+@@ -10,6 +10,7 @@ import { join } from "node:path";
+ import type { ModelCatalog, SmallModelFallback, TextGenerationOptions, TextGenerationUsage } from "../contracts.ts";
+ import type { killCliTree, spawnCli } from "../procs.ts";
+ import { refusesModel } from "../quick-model-fallback.ts";
++import { isImageModel } from "../model-kinds.ts";
+ import { decodeCodexSelection, OFFICIAL_CODEX_PROVIDER } from "./codex-catalog.ts";
+ import { codexConfigProviderArgs } from "./codex-config-provider.ts";
+ import { codexToolSurfaceArgs } from "./codex-tool-surface.ts";
+@@ -32,7 +33,10 @@ export function codexBackgroundModel(catalog: ModelCatalog, refused: ReadonlySet
+   const listed = catalog.options.filter((option) => !(official && option.custom) && !refused.has(option.id) &&
+     decodeCodexSelection(option.id).modelProvider === provider);
+   if (official) for (const id of CODEX_BACKGROUND_MODELS) if (listed.some((option) => option.id === id)) return id;
+-  const small = listed.find((option) => SMALL_MODEL.test(decodeCodexSelection(option.id).model ?? option.id))?.id;
++  const small = listed.find((option) => {
++    const model = decodeCodexSelection(option.id).model ?? option.id;
++    return SMALL_MODEL.test(model) && !isImageModel(`${model} ${option.label}`);
++  })?.id;
+   return small ?? (official ? accountDefault(catalog) : null);
+ }
+ 
+@@ -40,6 +44,15 @@ function accountDefault(catalog: ModelCatalog): string | null {
+   return catalog.default || catalog.options.find((option) => !option.custom)?.id || catalog.options[0]?.id || null;
+ }
+ 
++/** An explicitly pinned background model (`OMB_BACKGROUND_MODEL`), used as-is when the catalog lists it. */
++export function pinnedBackgroundModel(catalog: ModelCatalog, pin: string | undefined, provider: string): string | null {
++  const wanted = pin?.trim();
++  if (!wanted) return null;
++  const option = catalog.options.find((candidate) => candidate.id === wanted || candidate.id === `openrouter::${wanted}`);
++  if (!option) return null;
++  return decodeCodexSelection(option.id).modelProvider === provider ? option.id : null;
++}
++
+ export interface CodexBackgroundRoute {
+   model: string;
+   /** Run once more on this when the provider refuses `model`, or OpenAI is blocked or unreachable from here. */
+@@ -53,7 +66,8 @@ export function codexBackgroundRoute(catalog: ModelCatalog, smallModelsUsable: b
+   const own = fallback?.model || accountDefault(catalog);
+   const provider = own ? providerOf(own) : OFFICIAL_CODEX_PROVIDER;
+   const small = smallModelsUsable && !(openaiUnreachable && provider === OFFICIAL_CODEX_PROVIDER);
+-  const model = (small ? codexBackgroundModel(catalog, fallback?.refused, provider) : null) ?? own;
++  const pinned = pinnedBackgroundModel(catalog, process.env.OMB_BACKGROUND_MODEL, provider);
++  const model = pinned ?? (small ? codexBackgroundModel(catalog, fallback?.refused, provider) : null) ?? own;
+   if (!model) return null;
+   return own && own !== model ? { model, retry: own } : { model };
+ }
+diff --git a/server/model-kinds.ts b/server/model-kinds.ts
+new file mode 100644
+index 000000000..99530ee3a
+--- /dev/null
++++ b/server/model-kinds.ts
+@@ -0,0 +1,8 @@
++// A model that draws pictures is never a small text model: its name can carry a quick-looking word
++// (`gemini-nano-banana-2.1` has "nano"), so both the quick-turn and the background selectors skip it.
++const IMAGE_MODEL = /(?:^|[-_/. ])(?:image|images|imagegen|text-to-image|nano-banana\w*|dall-e\w*|dalle\w*|flux\w*|stable-diffusion\w*|sdxl\w*|imagen\w*|ideogram\w*|recraft\w*|seedream\w*|midjourney\w*)(?=$|[-_/. :])/i;
++
++/** True for an image-generation model id or label, in any provider's spelling. */
++export function isImageModel(name: string): boolean {
++  return IMAGE_MODEL.test(name);
++}
+diff --git a/server/turn-route.test.ts b/server/turn-route.test.ts
+index 18a750957..0c24a5dcc 100644
+--- a/server/turn-route.test.ts
++++ b/server/turn-route.test.ts
+@@ -74,6 +74,19 @@ describe("fastModelFor", () => {
+     expect(fastModelFor(claude, "claude-opus-5", new Set(["gpt-5.4-mini"]))).toBe("claude-haiku-4-5");
+   });
+ 
++  it("never picks an image model that happens to carry a quick word", () => {
++    const openrouter: ModelCatalog = {
++      default: "openrouter::deepseek/deepseek-v4.1-pro",
++      options: [
++        { id: "openrouter::deepseek/deepseek-v4.1-pro", label: "DeepSeek V4.1 Pro", provider: "openrouter" },
++        { id: "openrouter::google/gemini-nano-banana-2.1", label: "google/gemini-nano-banana-2.1 (OpenRouter)", provider: "openrouter" },
++        { id: "openrouter::openai/gpt-5.4-mini", label: "GPT 5.4 Mini", provider: "openrouter" },
++      ],
++    };
++    expect(fastModelFor(openrouter, "openrouter::deepseek/deepseek-v4.1-pro")).toBe("openrouter::openai/gpt-5.4-mini");
++    expect(fastModelFor(openrouter, "openrouter::google/gemini-nano-banana-2.1")).toBe("openrouter::openai/gpt-5.4-mini");
++  });
++
+   it("keeps a model that is already fast, and gives up without a catalog", () => {
+     expect(fastModelFor(claude, "claude-haiku-4-5")).toBe("claude-haiku-4-5");
+     expect(fastModelFor(undefined, "claude-opus-5")).toBeUndefined();
+diff --git a/server/turn-route.ts b/server/turn-route.ts
+index 1a9883ff2..109140bec 100644
+--- a/server/turn-route.ts
++++ b/server/turn-route.ts
+@@ -1,6 +1,7 @@
+ import type { ModelCatalog, ModelSelection } from "./contracts.ts";
+ import { isConversational, type ReplyStyle } from "../shared/reply-style.ts";
+ import type { EffortLevel } from "../shared/wire.ts";
++import { isImageModel } from "./model-kinds.ts";
+ 
+ export type TurnTier = "simple" | "complex";
+ 
+@@ -39,10 +40,11 @@ const FAST = /(^|[-_/. ])(haiku|flash|mini|nano|lite|small|fast|instant|spark|tu
+ /** Same upstream provider only; among several, the first listed wins since engines list their newest first. */
+ export function fastModelFor(catalog: ModelCatalog | undefined, current: string, refused: ReadonlySet<string> = new Set()): string | undefined {
+   if (!catalog) return undefined;
+-  if (FAST.test(current)) return current;
++  if (FAST.test(current) && !isImageModel(current)) return current;
+   const provider = catalog.options.find((option) => option.id === current)?.provider;
+   const pick = catalog.options.find((option) => !option.custom && !refused.has(option.id) &&
+-    FAST.test(option.id) && (option.provider ?? undefined) === (provider ?? undefined));
++    FAST.test(option.id) && !isImageModel(`${option.id} ${option.label}`) &&
++    (option.provider ?? undefined) === (provider ?? undefined));
+   return pick?.id;
+ }
+ 

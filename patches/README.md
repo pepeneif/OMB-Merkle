@@ -38,9 +38,12 @@ Cada parche se genera con `git diff --binary` del commit correspondiente del for
 | 010 | `010-v140-I-model-picker-compositor-130.patch` | Selector de modelos anclado al menu de 3 puntos (A21) y compositor de captura de la 130 (caja 2 renglones + emojis, sin sacar el texto de la fila) | v140-I (A13/A14/A15/A21) | `Composer.tsx`, `ComposerEmoji.tsx`, `ChatView.tsx`, `package.json`, `pnpm-lock.yaml`, `en.json` |
 | 011 | `011-v140-J-reorden-bots-setup-iconos.patch` | Reorden de bots con asa de arrastre (a la 130); boton `/setup` en el compositor; iconos distintos en el menu `/` (`/goal` diana, `/learn` birrete, `/setup` libro) | v140-J (130:0014/0015) | `Sidebar.tsx`, `SidebarBotDrag.tsx`, `sidebar-bot-drop.ts`, `Composer.tsx`, `SlashCommandMenu.tsx`, `en.json` |
 | 012 | `012-v140-K-asa-nombre-arrastre-rail.patch` | Asa de arrastre entre el avatar y el nombre; arrastre de bots con el rail colapsado (como la 130) | v140-K | `Sidebar.tsx` |
+| 013 | `013-v153-0012-reaplicado-y-cosmeticos-emojis.patch` | Re-aplica el aislamiento de computadoras por instalacion y los cosmeticos de emojis de la barra superior y el compositor | v153 | `server/*`, `src/components/*` |
+| 014 | `014-v165-fondo-sin-modelos-de-imagen.patch` | El selector de modelo de fondo y el de turno rapido ya no eligen modelos de imagen (nano-banana se colaba por el nombre); ancla `OMB_BACKGROUND_MODEL` | v165 (incidente 2026-11-17) | `server/model-kinds.ts`, `server/turn-route.ts`, `server/drivers/codex-background-text.ts` (+ pruebas) |
 
 ## Notas
 
+- El 014 va despues del 013, no comparte archivos con los anteriores y no depende de su orden.
 - Los parches 002, 003 y 006 tocan varios archivos en comun (`ChatView.tsx`, `ChatMoreMenu.tsx`):
   van en el mismo orden en que se hicieron, por eso aplican limpio en secuencia. Aplicarlos
   sueltos o en otro orden puede fallar.
