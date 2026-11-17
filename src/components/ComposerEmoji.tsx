@@ -48,7 +48,7 @@ export function ComposerEmoji({ onPick, disabled, simple = false }: {
           open && !simple && "bg-control text-ink",
         )}
       >
-        <Smile size={simple ? 16 : 18} />
+        <Smile size={simple ? 16 : 18} strokeWidth={1.75} absoluteStrokeWidth />
       </button>
       {open && (
         <div className="absolute bottom-full left-0 z-40 mb-2">

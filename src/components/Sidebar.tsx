@@ -782,7 +782,7 @@ export const BotListItem = memo(function BotListItem(props: BotRowProps) {
               // The grip is the row's drag source (the v130 gesture) and sits between the avatar and the name,
               // where it is easy to spot, instead of off at the row's right edge.
               <span data-bot-drag-handle={bot.id} {...drag.handle(bot.id)} aria-hidden="true" title={t("sidebar.section.dragToReorder")}
-                className="flex size-4 shrink-0 cursor-grab items-center justify-center rounded text-ink-secondary opacity-0 hover:bg-raised hover:text-ink group-hover:opacity-100 group-focus-within:opacity-100 active:cursor-grabbing">
+                className="flex size-4 shrink-0 cursor-grab items-center justify-center rounded text-ink-secondary opacity-0 hover:bg-raised hover:text-ink group-hover:opacity-100 group-focus-within:opacity-100 touch:opacity-100 active:cursor-grabbing">
                 <GripVertical size={13} />
               </span>
             )}

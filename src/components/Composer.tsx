@@ -850,9 +850,9 @@ export function Composer({
                 {approvalChoice && profile && bot && approvalModeFor(bot) !== approvalModeFor(profile) && <ApprovalChip choice={approvalChoice} />}
               </div>
             ) : (
-              /* Advanced mode's left cluster in two rows: the approval level and where the bot works on the top
-                 row, the room's goal chip with attach to its right on the bottom row, and the emoji picker above
-                 attach. On a narrow composer the row wraps as before, in the same order it always had. */
+              /* Advanced mode's left cluster in two rows. Top row: the approval level with where the bot works
+                 beside it, then setup next to the emoji picker (setup to its left). Bottom row: the room's goal
+                 chip, teach in the middle and attach on the right. On a narrow composer the row wraps as before. */
               <div className="grid grid-cols-[auto_auto_auto] grid-rows-2 items-center justify-items-start gap-1 @max-[30rem]/composer:flex @max-[30rem]/composer:flex-wrap">
                 <button
                   type="button"
@@ -869,31 +869,31 @@ export function Composer({
                     <GoalToggle {...goal} />
                   </div>
                 )}
-                {advanced && (approvalChoice || canSetup) && (
+                {advanced && (approvalChoice || (modeBot && !remoteClient)) && (
                   <div className="col-start-1 row-start-1 flex items-center gap-1">
                     {approvalChoice && <ApprovalModeSelector {...approvalChoice} />}
-                    {canSetup && (
-                      <button
-                        type="button"
-                        onClick={setupTask}
-                        aria-label={t("composer.setupTask")}
-                        title={t("composer.setupTask")}
-                        className="flex size-8 shrink-0 items-center justify-center rounded-full text-ink-secondary hover:bg-control hover:text-ink"
-                      >
-                        <BookOpen size={16} strokeWidth={1.75} absoluteStrokeWidth />
-                      </button>
+                    {modeBot && !remoteClient && (
+                      <PlaceChip
+                        bot={modeBot}
+                        task={composerTask}
+                        live={Boolean(modeBot.busy)}
+                        disabled={Boolean(modeBot.busy)}
+                        onPin={(surface) => dispatch({ type: "updateTask", botId: modeBot.id, threadId: modeBot.threadId, patch: { surface } })}
+                      />
                     )}
                   </div>
                 )}
-                {modeBot && !remoteClient && advanced && (
+                {advanced && canSetup && (
                   <div className="col-start-2 row-start-1">
-                    <PlaceChip
-                      bot={modeBot}
-                      task={composerTask}
-                      live={Boolean(modeBot.busy)}
-                      disabled={Boolean(modeBot.busy)}
-                      onPin={(surface) => dispatch({ type: "updateTask", botId: modeBot.id, threadId: modeBot.threadId, patch: { surface } })}
-                    />
+                    <button
+                      type="button"
+                      onClick={setupTask}
+                      aria-label={t("composer.setupTask")}
+                      title={t("composer.setupTask")}
+                      className="flex size-8 shrink-0 items-center justify-center rounded-full text-ink-secondary hover:bg-control hover:text-ink"
+                    >
+                      <BookOpen size={16} strokeWidth={1.75} absoluteStrokeWidth />
+                    </button>
                   </div>
                 )}
                 {advanced && (

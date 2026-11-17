@@ -1,0 +1,2 @@
+FROM openmausbot:v0.1.165-port
+COPY --chown=maus:maus dist /app/dist

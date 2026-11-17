@@ -7,7 +7,7 @@ import { useMenuMotion } from "./MenuMotion";
 import { t } from "@/lib/i18n";
 import { localizedTaskTitle } from "@/lib/task-title";
 import { COMPACT_BUBBLE } from "@/lib/compact-chip";
-import { ELEVATED_FLOAT, ELEVATED_HOVER } from "./elevated";
+import { ELEVATED_HEADER_FLOAT, ELEVATED_HEADER_HOVER } from "./elevated";
 
 import { formatTaskTokens, headlineTokens, usageDetail } from "@/lib/usage";
 import { nextRename } from "@/lib/rename";
@@ -235,8 +235,8 @@ function ConversationTaskPicker({
         className={cn(
           variant === "header"
             ? "flex h-9 max-w-[260px] items-center gap-1.5 rounded-full py-0.5 pl-3 pr-2.5 text-[14px] text-ink"
-            : "flex max-w-[220px] items-center gap-1.5 rounded-full border border-hairline/40 px-2.5 py-1 text-[13px] text-ink-secondary hover:bg-raised hover:text-ink",
-          variant === "header" ? cn(ELEVATED_FLOAT, ELEVATED_HOVER) : COMPACT_BUBBLE,
+            : "flex max-w-[220px] items-center gap-1.5 rounded-full border border-hairline/40 bg-raised/60 px-2.5 py-1 text-[13px] text-ink-secondary hover:bg-raised hover:text-ink",
+          variant === "header" ? cn(ELEVATED_HEADER_FLOAT, ELEVATED_HEADER_HOVER) : COMPACT_BUBBLE,
         )}
       >
         <span dir="auto" className="truncate @max-4xl/chathead:hidden">{current ? localizedTaskTitle(current.title?.trim() || t("task.newShort")) : t("task.switch")}</span>

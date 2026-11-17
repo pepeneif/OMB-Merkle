@@ -381,13 +381,13 @@ describe("the model picker in Simple mode", () => {
     expect(String(advanced.props.title)).toContain("High effort");
   });
 
-  it("puts the header chip on an opaque surface, so scrolled transcript text cannot read through it", () => {
+  it("gives the header chip the same raised surface as the other header pills (threads, usage)", () => {
     const classes = () => String(render(bot()).nodes.find((node) => node.props["data-tour"] === "model")!.props.className);
-    expect(classes().split(" ")).toEqual(expect.arrayContaining(["bg-composer", "ring-[0.5px]", "shadow-(--shadow-float)"]));
+    expect(classes().split(" ")).toEqual(expect.arrayContaining(["bg-raised/60", "ring-[0.5px]", "shadow-(--shadow-float)"]));
     expect(classes()).not.toMatch(/hover:bg-ink|aria-expanded:bg-ink/);
     fixture.advanced = true;
     try {
-      expect(classes().split(" ")).toEqual(expect.arrayContaining(["bg-composer", "shadow-(--shadow-float)"]));
+      expect(classes().split(" ")).toEqual(expect.arrayContaining(["bg-raised/60", "shadow-(--shadow-float)"]));
       expect(classes()).not.toMatch(/hover:bg-ink|aria-expanded:bg-ink/);
     } finally {
       fixture.advanced = false;
