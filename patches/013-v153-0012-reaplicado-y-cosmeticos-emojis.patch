@@ -1,0 +1,202 @@
+diff --git a/server/index.test.ts b/server/index.test.ts
+index 33b4bb1a9..67ca6ceaa 100644
+--- a/server/index.test.ts
++++ b/server/index.test.ts
+@@ -197,8 +197,10 @@ const managedBoatNameForFixture = (botId: string): string => {
+ };
+ 
+ const managedVpsNameForFixture = (botId: string): string => {
++  // vps-computer.ts scopes the name hash to the server installation, whose HOME differs from this process's.
++  const environmentId = readFileSync(join(home, ".openmausbot", "environment-id"), "utf8").trim();
+   const botPrefix = botId.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 12) || "bot";
+-  const botHash = createHash("sha256").update(botId).digest("hex").slice(0, 12);
++  const botHash = createHash("sha256").update(environmentId).update("\n").update(botId).digest("hex").slice(0, 12);
+   return `openmausbot-vps-${botPrefix}-${botHash}`;
+ };
+ 
+diff --git a/server/vps-computer.ts b/server/vps-computer.ts
+index e139f6b32..efa850b82 100644
+--- a/server/vps-computer.ts
++++ b/server/vps-computer.ts
+@@ -151,7 +151,9 @@ function containerNamePart(botId: string): string {
+ }
+ 
+ export function vpsContainerName(botId: string): string {
+-  const hash = createHash("sha256").update(botId).digest("hex").slice(0, 12);
++  // Scoped to this installation: a cloned data dir (same bot ids) sharing the same Docker daemon
++  // must never resolve to — or be able to remove — another installation's computer.
++  const hash = createHash("sha256").update(vpsEnvironmentId()).update("\n").update(botId).digest("hex").slice(0, 12);
+   return `${VPS_CONTAINER_PREFIX}-${containerNamePart(botId)}-${hash}`;
+ }
+ 
+diff --git a/src/components/Composer.tsx b/src/components/Composer.tsx
+index c267a4b59..82dcf633d 100644
+--- a/src/components/Composer.tsx
++++ b/src/components/Composer.tsx
+@@ -838,9 +838,9 @@ export function Composer({
+                 {approvalChoice && profile && bot && approvalModeFor(bot) !== approvalModeFor(profile) && <ApprovalChip choice={approvalChoice} />}
+               </div>
+             ) : (
+-              /* Advanced mode's left cluster in two rows: the approval level and where the bot works on the top
+-                 row, the room's goal chip with attach to its right on the bottom row, and the emoji picker above
+-                 attach. On a narrow composer the row wraps as before, in the same order it always had. */
++              /* Advanced mode's left cluster in two rows. Top row: the approval level with where the bot works
++                 beside it, then setup next to the emoji picker (setup to its left). Bottom row: the room's goal
++                 chip, teach in the middle and attach on the right. On a narrow composer the row wraps as before. */
+               <div className="grid grid-cols-[auto_auto_auto] grid-rows-2 items-center justify-items-start gap-1 @max-[30rem]/composer:flex @max-[30rem]/composer:flex-wrap">
+                 <button
+                   type="button"
+@@ -857,31 +857,31 @@ export function Composer({
+                     <GoalToggle {...goal} />
+                   </div>
+                 )}
+-                {advanced && (approvalChoice || canSetup) && (
++                {advanced && (approvalChoice || (modeBot && !remoteClient)) && (
+                   <div className="col-start-1 row-start-1 flex items-center gap-1">
+                     {approvalChoice && <ApprovalModeSelector {...approvalChoice} />}
+-                    {canSetup && (
+-                      <button
+-                        type="button"
+-                        onClick={setupTask}
+-                        aria-label={t("composer.setupTask")}
+-                        title={t("composer.setupTask")}
+-                        className="flex size-8 shrink-0 items-center justify-center rounded-full text-ink-secondary hover:bg-control hover:text-ink"
+-                      >
+-                        <BookOpen size={16} strokeWidth={1.75} absoluteStrokeWidth />
+-                      </button>
++                    {modeBot && !remoteClient && (
++                      <PlaceChip
++                        bot={modeBot}
++                        task={composerTask}
++                        live={Boolean(modeBot.busy)}
++                        disabled={Boolean(modeBot.busy)}
++                        onPin={(surface) => dispatch({ type: "updateTask", botId: modeBot.id, threadId: modeBot.threadId, patch: { surface } })}
++                      />
+                     )}
+                   </div>
+                 )}
+-                {modeBot && !remoteClient && advanced && (
++                {advanced && canSetup && (
+                   <div className="col-start-2 row-start-1">
+-                    <PlaceChip
+-                      bot={modeBot}
+-                      task={composerTask}
+-                      live={Boolean(modeBot.busy)}
+-                      disabled={Boolean(modeBot.busy)}
+-                      onPin={(surface) => dispatch({ type: "updateTask", botId: modeBot.id, threadId: modeBot.threadId, patch: { surface } })}
+-                    />
++                    <button
++                      type="button"
++                      onClick={setupTask}
++                      aria-label={t("composer.setupTask")}
++                      title={t("composer.setupTask")}
++                      className="flex size-8 shrink-0 items-center justify-center rounded-full text-ink-secondary hover:bg-control hover:text-ink"
++                    >
++                      <BookOpen size={16} strokeWidth={1.75} absoluteStrokeWidth />
++                    </button>
+                   </div>
+                 )}
+                 {advanced && (
+diff --git a/src/components/ComposerEmoji.tsx b/src/components/ComposerEmoji.tsx
+index fc9e996d9..19d852b6d 100644
+--- a/src/components/ComposerEmoji.tsx
++++ b/src/components/ComposerEmoji.tsx
+@@ -48,7 +48,7 @@ export function ComposerEmoji({ onPick, disabled, simple = false }: {
+           open && !simple && "bg-control text-ink",
+         )}
+       >
+-        <Smile size={simple ? 16 : 18} />
++        <Smile size={simple ? 16 : 18} strokeWidth={1.75} absoluteStrokeWidth />
+       </button>
+       {open && (
+         <div className="absolute bottom-full left-0 z-40 mb-2">
+diff --git a/src/components/ModelPicker.simple.test.ts b/src/components/ModelPicker.simple.test.ts
+index 6eaed50a7..6bfd21e22 100644
+--- a/src/components/ModelPicker.simple.test.ts
++++ b/src/components/ModelPicker.simple.test.ts
+@@ -381,13 +381,13 @@ describe("the model picker in Simple mode", () => {
+     expect(String(advanced.props.title)).toContain("High effort");
+   });
+ 
+-  it("puts the header chip on an opaque surface, so scrolled transcript text cannot read through it", () => {
++  it("gives the header chip the same raised surface as the other header pills (threads, usage)", () => {
+     const classes = () => String(render(bot()).nodes.find((node) => node.props["data-tour"] === "model")!.props.className);
+-    expect(classes().split(" ")).toEqual(expect.arrayContaining(["bg-composer", "ring-[0.5px]", "shadow-(--shadow-float)"]));
++    expect(classes().split(" ")).toEqual(expect.arrayContaining(["bg-raised/60", "ring-[0.5px]", "shadow-(--shadow-float)"]));
+     expect(classes()).not.toMatch(/hover:bg-ink|aria-expanded:bg-ink/);
+     fixture.advanced = true;
+     try {
+-      expect(classes().split(" ")).toEqual(expect.arrayContaining(["bg-composer", "shadow-(--shadow-float)"]));
++      expect(classes().split(" ")).toEqual(expect.arrayContaining(["bg-raised/60", "shadow-(--shadow-float)"]));
+       expect(classes()).not.toMatch(/hover:bg-ink|aria-expanded:bg-ink/);
+     } finally {
+       fixture.advanced = false;
+diff --git a/src/components/ModelPicker.tsx b/src/components/ModelPicker.tsx
+index 894a00ecd..cea8325f7 100644
+--- a/src/components/ModelPicker.tsx
++++ b/src/components/ModelPicker.tsx
+@@ -14,7 +14,7 @@ import { pickerPlacement, type PickerPlacement } from "@/lib/picker-placement";
+ import type { Typeahead } from "@/lib/menu-keys";
+ import { usePopoverDismiss } from "@/hooks/use-popover-dismiss";
+ import { InstanceProviderMark } from "./ProviderIcons";
+-import { ELEVATED_FLOAT, ELEVATED_HOVER } from "./elevated";
++import { ELEVATED_HEADER_FLOAT, ELEVATED_HEADER_HOVER } from "./elevated";
+ import { ApiKeyHint, EngineSetup, EngineUpdateNotice, InstanceAccountNotes, needsCli, needsSignIn, openKeysFor } from "./EngineSetup";
+ import { offersLocalModels, probeLocalModels } from "./local-model-probe";
+ import { ConfirmDialog } from "./ConfirmDialog";
+@@ -617,7 +617,7 @@ export function ModelPicker({
+         "group flex items-center gap-1.5 rounded-full py-1 pl-2 pr-2.5 text-[13px] text-ink disabled:cursor-not-allowed",
+         contained
+           ? "hover:bg-ink/[0.06] aria-expanded:bg-ink/[0.08] disabled:opacity-50 disabled:hover:bg-transparent"
+-          : cn(ELEVATED_FLOAT, ELEVATED_HOVER, "disabled:text-ink-tertiary disabled:hover:bg-composer"),
++          : cn(ELEVATED_HEADER_FLOAT, ELEVATED_HEADER_HOVER, "disabled:text-ink-tertiary disabled:hover:bg-composer"),
+         !contained && active && !showActiveAccount && cn(COMPACT_SQUARE, USAGE_WARN_WIDENS),
+       )}
+     >
+@@ -662,7 +662,7 @@ export function ModelPicker({
+         "group flex items-center rounded-full text-[13px] leading-[18px] text-ink-secondary disabled:cursor-not-allowed disabled:text-ink-tertiary",
+         contained
+           ? "min-w-0 max-w-[72%] transition-colors duration-150 hover:bg-ink/[0.06] hover:text-ink aria-expanded:bg-ink/[0.08] aria-expanded:text-ink disabled:hover:bg-transparent"
+-          : cn("shrink-0", ELEVATED_FLOAT, ELEVATED_HOVER, "hover:text-ink aria-expanded:text-ink disabled:hover:bg-composer"),
++          : cn("shrink-0", ELEVATED_HEADER_FLOAT, ELEVATED_HEADER_HOVER, "hover:text-ink aria-expanded:text-ink disabled:hover:bg-composer"),
+         size === "sm" ? "h-7 pl-2 pr-1.5" : "h-8 pl-2.5 pr-2",
+       )}
+     >
+diff --git a/src/components/TaskPicker.tsx b/src/components/TaskPicker.tsx
+index 5ba74a5eb..8253e9aee 100644
+--- a/src/components/TaskPicker.tsx
++++ b/src/components/TaskPicker.tsx
+@@ -7,7 +7,7 @@ import { useMenuMotion } from "./MenuMotion";
+ import { t } from "@/lib/i18n";
+ import { localizedTaskTitle } from "@/lib/task-title";
+ import { COMPACT_BUBBLE } from "@/lib/compact-chip";
+-import { ELEVATED_FLOAT, ELEVATED_HOVER } from "./elevated";
++import { ELEVATED_HEADER_FLOAT, ELEVATED_HEADER_HOVER } from "./elevated";
+ 
+ import { formatTaskTokens, headlineTokens, usageDetail } from "@/lib/usage";
+ import { nextRename } from "@/lib/rename";
+@@ -235,8 +235,8 @@ function ConversationTaskPicker({
+         className={cn(
+           variant === "header"
+             ? "flex h-9 max-w-[260px] items-center gap-1.5 rounded-full py-0.5 pl-3 pr-2.5 text-[14px] text-ink"
+-            : "flex max-w-[220px] items-center gap-1.5 rounded-full border border-hairline/40 px-2.5 py-1 text-[13px] text-ink-secondary hover:bg-raised hover:text-ink",
+-          variant === "header" ? cn(ELEVATED_FLOAT, ELEVATED_HOVER) : COMPACT_BUBBLE,
++            : "flex max-w-[220px] items-center gap-1.5 rounded-full border border-hairline/40 bg-raised/60 px-2.5 py-1 text-[13px] text-ink-secondary hover:bg-raised hover:text-ink",
++          variant === "header" ? cn(ELEVATED_HEADER_FLOAT, ELEVATED_HEADER_HOVER) : COMPACT_BUBBLE,
+         )}
+       >
+         <span dir="auto" className="truncate @max-4xl/chathead:hidden">{current ? localizedTaskTitle(current.title?.trim() || t("task.newShort")) : t("task.switch")}</span>
+diff --git a/src/components/elevated.ts b/src/components/elevated.ts
+index 805bdf45f..4e69ad380 100644
+--- a/src/components/elevated.ts
++++ b/src/components/elevated.ts
+@@ -5,5 +5,9 @@ export const ELEVATED_FLOAT = `${ELEVATED_CARD} shadow-(--shadow-float)`;
+ /** The hover tint alone, for a control whose aria-expanded is not a menu of its own. */
+ export const ELEVATED_TINT = "transition-colors duration-[120ms] hover:bg-[color-mix(in_srgb,var(--color-composer),var(--color-ink)_7%)]";
+ export const ELEVATED_HOVER = `${ELEVATED_TINT} aria-expanded:bg-[color-mix(in_srgb,var(--color-composer),var(--color-ink)_7%)]`;
++/** The chat-header pills (threads, usage, model): the reference fill of the usage pill, raised on hover. */
++export const ELEVATED_HEADER_FLOAT = "bg-raised/60 ring-[0.5px] ring-ink/10 shadow-(--shadow-float)";
++export const ELEVATED_HEADER_HOVER = "transition-colors duration-[120ms] hover:bg-raised aria-expanded:bg-raised";
++
+ /** The hover tint as a plain fill, for a trigger whose aria-expanded sits on a wrapping button. */
+ export const ELEVATED_OPEN = "bg-[color-mix(in_srgb,var(--color-composer),var(--color-ink)_7%)]";
