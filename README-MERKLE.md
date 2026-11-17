@@ -299,8 +299,7 @@ y selector de modelo). Bundle reconstruido y servido.
 ## Despliegue en alfa (2026-11-17 03:25 UTC)
 
 - Contenedor `omb-165-omb-1`, proyecto compose `/home/pepeneif/deploy-165`, red host,
-  puertos **9899** (app) y **9900** (webhooks). Imagen `openmausbot:v0.1.165-r4`
-  (ID `4f951c79aecd`, 2.15 GB); `r1`–`r3` quedan para revertir.
+  puertos **9899** (app) y **9900** (webhooks). Imagen `openmausbot:v0.1.165-r6` (las `r1`-`r5` quedan para revertir).
 - Volumen propio `omb_165_data`: copia en caliente del `omb_143_data` + delta tras parar la
   149 (`stop -t 60`, exit 0, lease liberado). `messages.db` con md5 identico al de la 153.
 - Vhost de Caddy sin cambios (sigue apuntando a 9899).
@@ -315,3 +314,33 @@ y selector de modelo). Bundle reconstruido y servido.
 - `merkle/v154-port` tambien quedo con este README desactualizado (encabezado de la 140); no
   afecta ejecucion.
 - Este archivo no se ha commiteado en la rama `merkle/v165-port`.
+
+### Incidente 2026-11-17 04:45 UTC — el escritorio del VPS no arrancaba
+
+Sintoma: al pedir una tarea salia "Prepare the pinned OpenMausBot Cua image on the VPS
+(Driver 0.37.0)" y el panel de pantalla decia "Couldnt reach the bots screen".
+
+Dos causas, ambas del mismo origen: las imagenes `r2`-`r4` se construian con
+`.Dockerfile.dist`, que solo copiaba `dist` (el bundle web) y **no** `dist-server`. El
+servidor dentro del contenedor seguia siendo el de la construccion de las 02:40, anterior al
+parche 013.
+
+1. La 165 pide la capa de imagen **9** (`cua-local-vm:driver-0.37.0-v9`), que no existia en el
+   VPS; solo habia `v6` y `v8`. La capa 9 solo cambia el script de arranque del driver:
+   agrega `--grant existing-profile`.
+2. Sin el 013 en `dist-server`, `vpsContainerName()` calculaba el hash **sin** el
+   `environment-id`, asi que alfa resolvia el contenedor de **produccion**
+   (`…-56f06f9de0ac`, entorno `f4c6649a…`) en vez del suyo (`…-52d1bced558b`,
+   entorno `a8ff433b…`). Por eso el `remove` respondia 409 "container OpenMausBot did not
+   create".
+
+Arreglo:
+- Se construyo `localhost/openmausbot/cua-local-vm:driver-0.37.0-v9` encima de la `v8` con
+  el flag y las etiquetas `cua-driver=0.37.0`, `image-layer=9`, `local-vm=1`.
+- `.Dockerfile.dist` ahora copia tambien `dist-server`; se regenero el bundle con
+  `pnpm build:server` y se construyo `openmausbot:v0.1.165-r6`.
+- Se desplego `r6` en `deploy-165`, se retiro el escritorio viejo por la API y se aprovisiono
+  de nuevo: `ready=true`, `desktopReady=true`, captura 200.
+
+Verificado: escritorio de alfa `env=a8ff433b… layer=9 running`; produccion
+(`omb-prod-omb-1` y su escritorio `…-83dd946e8eb8`) sin tocar; `beta` y `alfa` en 200.
