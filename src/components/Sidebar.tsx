@@ -1265,7 +1265,7 @@ export const Sidebar = memo(function Sidebar({ open, onClose, collapseToIcons = 
         open ? "max-md:translate-x-0" : "max-md:-translate-x-full",
       )}
     >
-      <GlassScrollFrame className="flex-1" fade={!advanced}><PlaceTint />
+      <GlassScrollFrame className="flex-1 [--glass-reach:0px]" fade={!advanced}><PlaceTint />
       <GlassBar edge="top">
       <div
         data-sidebar-top-row={corner ? "corner" : true}

@@ -41,9 +41,17 @@ Cada parche se genera con `git diff --binary` del commit correspondiente del for
 | 013 | `013-v153-0012-reaplicado-y-cosmeticos-emojis.patch` | Re-aplica el aislamiento de computadoras por instalacion y los cosmeticos de emojis de la barra superior y el compositor | v153 | `server/*`, `src/components/*` |
 | 014 | `014-v165-fondo-sin-modelos-de-imagen.patch` | El selector de modelo de fondo y el de turno rapido ya no eligen modelos de imagen (nano-banana se colaba por el nombre); ancla `OMB_BACKGROUND_MODEL` | v165 (incidente 2026-11-17) | `server/model-kinds.ts`, `server/turn-route.ts`, `server/drivers/codex-background-text.ts` (+ pruebas) |
 
+| 015 | `015-v165-coordinacion-sin-duplicar.patch` | Coordinacion del Chief: fusiona el parrafo de equipos con la regla del SOUL (un solo lugar para "presenta el bot y su modelo"), parte el bloque de delegacion en entrega y retorno, y quita repeticiones ("one point of contact" dos veces, el manejo del resultado del tool duplicado) | v165 (2026-11-17) | `server/chief-of-staff.ts` (+ prueba) |
+| 016 | `016-v165-riel-menos-hueco-y-letra-mensajes.patch` | Riel colapsado: quita la banda muerta de 24 px del vidrio, encoge el bloque de iconos y deja 4 px entre ellos, para que quepa un avatar mas; letra de las burbujas 15/22 a 17/25 (el compositor se queda en 15 px) | v165 (2026-11-17) | `src/components/Sidebar.tsx`, `src/components/SidebarFooter.tsx`, `src/components/SidebarFooterNav.tsx`, `src/components/chat-bubble.ts`, `src/components/ChatView.tsx`, `src/components/GroupView.tsx`, `src/components/BubbleEditor.tsx`, `src/styles.css` (+ pruebas) |
+
 ## Notas
 
 - El 014 va despues del 013, no comparte archivos con los anteriores y no depende de su orden.
+- El 015 solo toca `server/chief-of-staff.ts` y su prueba: no comparte archivos con ningun otro parche.
+  Baja las reglas fijas de coordinacion de 4,996 a 4,109 bytes (y el bloque completo con 13 bots de 7,546 a 6,661).
+- El 016 va despues del 015. Toca la barra lateral y la tipografia del chat; ninguno de esos
+  archivos lo toca el 015. `ChatView.conversational.test.ts` fija `text-[17px]` y `leading-[25px]`:
+  si otro parche cambia la burbuja, este va despues.
 - Los parches 002, 003 y 006 tocan varios archivos en comun (`ChatView.tsx`, `ChatMoreMenu.tsx`):
   van en el mismo orden en que se hicieron, por eso aplican limpio en secuencia. Aplicarlos
   sueltos o en otro orden puede fallar.

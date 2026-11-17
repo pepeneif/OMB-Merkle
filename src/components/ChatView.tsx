@@ -456,7 +456,7 @@ const Bubble = memo(function Bubble({
           data-chat-bubble={simple ? "simple" : ""} data-look={user ? "user-bubble" : "bot-bubble"}
           className={cn(
             tabled ? "w-full" : "w-fit",
-            simple ? !tabled && SIMPLE_BUBBLE_MAX : "max-w-[min(var(--chat-bubble-max),var(--chat-bubble-pct))] rounded-2xl text-[15px] leading-relaxed",
+            simple ? !tabled && SIMPLE_BUBBLE_MAX : "max-w-[min(var(--chat-bubble-max),var(--chat-bubble-pct))] rounded-2xl text-[17px] leading-relaxed",
             !simple && "bbl",
             !simple && (user ? "bbl-user" : "bbl-bot"),
             emerging && !streamedReply(message.id) && "turn-answer",

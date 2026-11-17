@@ -305,7 +305,7 @@ describe("toolbar tools layout", () => {
     fixture.advanced = true;
     const rows = render("icons").html;
     expect(render("icons", { toolsLayout: "toolbar" }).html).toBe(rows);
-    expect(rows).toContain('class="flex flex-col items-center gap-0"');
+    expect(rows).toContain('class="flex flex-col items-center gap-1"');
   });
 
   it("rows layout renders exactly as before", () => {

@@ -47,7 +47,7 @@ function NavRow({
       aria-current={active ? "page" : undefined}
       className={cn(
         "relative flex items-center rounded-xl transition-colors",
-        rail ? "size-9 shrink-0 justify-center" : iconsOnly ? "mx-auto size-10 shrink-0 justify-center" : "w-full min-h-9 gap-3 px-3 py-1.5 text-left",
+        rail ? "size-9 shrink-0 justify-center" : iconsOnly ? "mx-auto size-8 shrink-0 justify-center" : "w-full min-h-9 gap-3 px-3 py-1.5 text-left",
         active ? "bg-raised text-ink" : "text-ink hover:bg-raised/50",
       )}
     >
@@ -199,7 +199,7 @@ export function SidebarFooterNav({
   );
 
   if (iconsOnly) {
-    return <nav data-tour="tools" aria-label={t("sidebar.tools")} className="flex flex-col items-center gap-0">{rows}</nav>;
+    return <nav data-tour="tools" aria-label={t("sidebar.tools")} className="flex flex-col items-center gap-1">{rows}</nav>;
   }
   return (
     <div data-tour="tools">
