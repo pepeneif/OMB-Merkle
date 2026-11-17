@@ -57,6 +57,36 @@ describe("rich table rendering", () => {
   });
 });
 
+describe("a heading lines up with what is under it", () => {
+  const row = (cells: string[]) => cells.map((text) => ({ text }));
+  it("puts the sort button before a numeric heading and after a text one", () => {
+    const html = renderToStaticMarkup(createElement(RichTable, {
+      columns: [{ text: "Reporte" }, { text: "Diferencia" }], rows: [row(["Anterior", "-200.00"])], card: false,
+    }));
+    const numeric = html.slice(html.lastIndexOf("<th"), html.lastIndexOf("</th>"));
+    expect(numeric.indexOf("<button")).toBeLessThan(numeric.indexOf("Diferencia"));
+    const text = html.slice(html.indexOf("<th"), html.indexOf("</th>"));
+    expect(text.indexOf("Reporte")).toBeLessThan(text.indexOf("<button"));
+  });
+  it("gives every numeric column one width so the figures stack", () => {
+    const html = renderToStaticMarkup(createElement(RichTable, {
+      columns: [{ text: "A" }, { text: "B" }], rows: [row(["1.00", "1,234,567.89"])], card: false,
+    }));
+    const widths = [...html.matchAll(/text-align:right;width:(\d+)px/g)].map((match) => match[1]);
+    expect(widths.length).toBe(2);
+    expect(new Set(widths).size).toBe(1);
+  });
+  it("shares one width across equal columns when asked", () => {
+    const html = renderToStaticMarkup(createElement(RichTable, {
+      columns: [{ text: "Límite" }, { text: "Gastado" }, { text: "Disponible" }],
+      rows: [row(["3,588,918.81", "3,338,122.58", "250,796.23"])], card: false, equal: true,
+    }));
+    const widths = [...html.matchAll(/<col style="width:(\d+)px"/g)].map((match) => match[1]);
+    expect(widths.length).toBe(3);
+    expect(new Set(widths).size).toBe(1);
+  });
+});
+
 describe("Simple mode's table card", () => {
   const card = (rows: number) => {
     mode.advanced = false;

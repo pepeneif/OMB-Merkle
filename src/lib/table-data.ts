@@ -32,16 +32,20 @@ export function parseTableFile(text: string, delimiter: "," | "\t"): TextTable {
 }
 
 const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+/** A typographic minus (U+2212) reads as a minus sign, so a column of \u2212541.72 is still a column of amounts. */
+const plainSign = (text: string): string => text.trim().replace(/^\u2212/, "-");
+
 const NUMBER = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i;
-export function isTableNumber(text: string): boolean { return NUMBER.test(text.trim()); }
+export function isTableNumber(text: string): boolean { return NUMBER.test(plainSign(text)); }
 
 const AMOUNT = /^[+-]?[$€£¥₹]?\d{1,3}(?:,?\d{3})*(?:\.\d+)?%?$/;
 /** A cell that reads as a quantity (a plain number, a price, a percentage), so its column lines up on the right. */
-export function isTableAmount(text: string): boolean { return isTableNumber(text) || AMOUNT.test(text.trim()); }
+export function isTableAmount(text: string): boolean { return isTableNumber(text) || AMOUNT.test(plainSign(text)); }
 
 function decimalParts(text: string): { sign: number; order: bigint; digits: string } {
-  const negative = text.startsWith("-");
-  const [mantissa = "", exponent = "0"] = text.replace(/^[+-]/, "").toLowerCase().split("e");
+  const plain = plainSign(text);
+  const negative = plain.startsWith("-");
+  const [mantissa = "", exponent = "0"] = plain.replace(/^[+-]/, "").toLowerCase().split("e");
   const dot = mantissa.indexOf(".");
   const decimals = dot < 0 ? 0 : mantissa.length - dot - 1;
   const digits = mantissa.replace(".", "").replace(/^0+/, "");

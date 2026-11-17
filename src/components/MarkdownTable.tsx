@@ -40,5 +40,6 @@ export function MarkdownTable({ children, direction }: { children?: ReactNode; d
     const rows = elements(body?.props.children).map((row) => elements(row.props.children).map(cell));
     return { columns, rows };
   }, [children]);
-  return <RichTable {...data} direction={direction} />;
+  /** A table of three or four columns is read as a comparison: equal widths keep the figures in line. */
+  return <RichTable {...data} direction={direction} equal={data.columns.length > 1 && data.columns.length <= 4} />;
 }

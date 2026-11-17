@@ -52,4 +52,8 @@ describe("isTableAmount", () => {
     for (const amount of ["612", "$612", "-$1,234.50", "€9", "12%", "1234", "0.5"]) expect(isTableAmount(amount), amount).toBe(true);
     for (const text of ["TAP Air Portugal", "Thu 18:40", "2026-11-08", "$", "1,23", "12 %%"]) expect(isTableAmount(text), text).toBe(false);
   });
+  it("reads a typographic minus as a sign, so columns of those amounts count as numeric", () => {
+    for (const amount of ["\u2212200.00", "\u2212541.72", "+341.72"]) expect(isTableAmount(amount), amount).toBe(true);
+    expect(tableRowOrder([["\u22122.50"], ["1.00"], ["\u221210.00"]], "", { column: 0, descending: false })).toEqual([2, 0, 1]);
+  });
 });
