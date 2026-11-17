@@ -47,7 +47,12 @@ Cada parche se genera con `git diff --binary` del commit correspondiente del for
 | 017 | `017-v165-tablas-columnas-numericas.patch` | Tablas del chat: el boton de ordenar va antes del rotulo cuando la columna es de numeros (alineado con las cifras) y despues cuando es de texto; todas las columnas numericas comparten un ancho calculado del valor mas largo; en tablas de 2 a 4 columnas todas van iguales; y el menos tipografico (U+2212) cuenta como signo, asi una columna con -200.00 se reconoce como numerica | v165 (2026-11-17) | `src/components/RichTable.tsx`, `src/components/MarkdownTable.tsx`, `src/lib/table-data.ts` (+ pruebas) |
 | 018 | `018-v165-vps-desktop-lease.patch` | Escritorio del VPS: deja de reinspeccionar el contenedor completo en cada turno. Una concesion de 3 min recuerda el estado ya verificado; a partir del minuto se comprueba con una sonda barata del driver sobre el mismo id de contenedor. Se revalida en pleno si cambia o se para el contenedor, si falla un frame o si vence la concesion. Quita 6-8 s de cada turno y deja el arranque en menos de 300 ms | v165 (2026-11-17) | `server/vps-computer.ts` (+ pruebas) |
 
+| 019 | `019-v165-concesion-renovable.patch` | Escritorio del VPS: la concesion del 018 se renueva con cada sonda buena (antes caducaba a los 3 min y el turno siguiente pagaba los 6-8 s de la inspeccion completa). TTL de 3 a 10 min y techo duro de 30 min, que fuerza una inspeccion completa aunque la sonda responda, para que nada se apoye en una sola lectura en toda la sesion | v165 (2026-11-17) | `server/vps-computer.ts` (+ pruebas) |
+
 ## Notas
+
+- El 019 va despues del 018 y toca los mismos dos archivos: aplica en secuencia, no suelto.
+  La sonda barata sigue siendo la misma; solo renueva la concesion y se respeta el techo de 30 min.
 
 - El 018 va despues del 017 y solo toca `server/vps-computer.ts` y su prueba: no comparte
   archivos con ningun otro parche. La concesion solo se usa con el runner real; con un runner

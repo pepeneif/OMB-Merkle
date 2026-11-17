@@ -557,8 +557,15 @@ describe("VPS computer", () => {
       expect(fake.calls.filter(({ args }) => args[2] === "image")).toHaveLength(1);
       expect(fake.calls.filter(({ args }) => args[2] === "exec" && args.includes("status"))).toHaveLength(2);
 
-      // The lease expires: the next turn inspects in full again.
-      await vi.advanceTimersByTimeAsync(3 * 60_000);
+      // A probe that answers renews the lease, so a steady stream of turns never re-inspects.
+      for (let turn = 0; turn < 20; turn += 1) {
+        await vi.advanceTimersByTimeAsync(60_000);
+        expect((await vpsComputerAction("provision", cfg, BOT_ID)).ready).toBe(true);
+      }
+      expect(inspections()).toBe(1);
+
+      // The ceiling still forces one full inspection, whatever the probes answered.
+      await vi.advanceTimersByTimeAsync(10 * 60_000);
       expect((await vpsComputerAction("provision", cfg, BOT_ID)).ready).toBe(true);
       expect(inspections()).toBe(2);
     } finally {

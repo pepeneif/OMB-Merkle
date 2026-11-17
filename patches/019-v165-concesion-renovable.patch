@@ -1,0 +1,106 @@
+diff --git a/patches/README.md b/patches/README.md
+index 963466d1f..9485cab90 100644
+--- a/patches/README.md
++++ b/patches/README.md
+@@ -47,8 +47,13 @@ Cada parche se genera con `git diff --binary` del commit correspondiente del for
+ | 017 | `017-v165-tablas-columnas-numericas.patch` | Tablas del chat: el boton de ordenar va antes del rotulo cuando la columna es de numeros (alineado con las cifras) y despues cuando es de texto; todas las columnas numericas comparten un ancho calculado del valor mas largo; en tablas de 2 a 4 columnas todas van iguales; y el menos tipografico (U+2212) cuenta como signo, asi una columna con -200.00 se reconoce como numerica | v165 (2026-11-17) | `src/components/RichTable.tsx`, `src/components/MarkdownTable.tsx`, `src/lib/table-data.ts` (+ pruebas) |
+ | 018 | `018-v165-vps-desktop-lease.patch` | Escritorio del VPS: deja de reinspeccionar el contenedor completo en cada turno. Una concesion de 3 min recuerda el estado ya verificado; a partir del minuto se comprueba con una sonda barata del driver sobre el mismo id de contenedor. Se revalida en pleno si cambia o se para el contenedor, si falla un frame o si vence la concesion. Quita 6-8 s de cada turno y deja el arranque en menos de 300 ms | v165 (2026-11-17) | `server/vps-computer.ts` (+ pruebas) |
+ 
++| 019 | `019-v165-concesion-renovable.patch` | Escritorio del VPS: la concesion del 018 se renueva con cada sonda buena (antes caducaba a los 3 min y el turno siguiente pagaba los 6-8 s de la inspeccion completa). TTL de 3 a 10 min y techo duro de 30 min, que fuerza una inspeccion completa aunque la sonda responda, para que nada se apoye en una sola lectura en toda la sesion | v165 (2026-11-17) | `server/vps-computer.ts` (+ pruebas) |
++
+ ## Notas
+ 
++- El 019 va despues del 018 y toca los mismos dos archivos: aplica en secuencia, no suelto.
++  La sonda barata sigue siendo la misma; solo renueva la concesion y se respeta el techo de 30 min.
++
+ - El 018 va despues del 017 y solo toca `server/vps-computer.ts` y su prueba: no comparte
+   archivos con ningun otro parche. La concesion solo se usa con el runner real; con un runner
+   inyectado (pruebas, diagnostico) la inspeccion sigue siendo completa como antes.
+diff --git a/scripts/testing/file-size-ratchet.test.ts b/scripts/testing/file-size-ratchet.test.ts
+index 76d6ceb11..736e24005 100644
+--- a/scripts/testing/file-size-ratchet.test.ts
++++ b/scripts/testing/file-size-ratchet.test.ts
+@@ -35,7 +35,7 @@ const LINES: Record<string, number> = {
+   "src/components/CursorAvatar.tsx": 1324,
+   "server/skills.ts": 1379,
+   "server/composio.ts": 1038,
+-  "server/vps-computer.ts": 1369, // port 013 +2 (naming); port 018 desktop lease +80
++  "server/vps-computer.ts": 1384, // port 013 +2 (naming); port 018 lease +80; port 019 lease renewal +15
+   "scripts/mcp-server.ts": 1411,
+   "server/boat.ts": 1253,
+   "server/drivers/pi.ts": 1033,
+diff --git a/server/vps-computer.test.ts b/server/vps-computer.test.ts
+index b98ccb283..2b30670a0 100644
+--- a/server/vps-computer.test.ts
++++ b/server/vps-computer.test.ts
+@@ -557,8 +557,15 @@ describe("VPS computer", () => {
+       expect(fake.calls.filter(({ args }) => args[2] === "image")).toHaveLength(1);
+       expect(fake.calls.filter(({ args }) => args[2] === "exec" && args.includes("status"))).toHaveLength(2);
+ 
+-      // The lease expires: the next turn inspects in full again.
+-      await vi.advanceTimersByTimeAsync(3 * 60_000);
++      // A probe that answers renews the lease, so a steady stream of turns never re-inspects.
++      for (let turn = 0; turn < 20; turn += 1) {
++        await vi.advanceTimersByTimeAsync(60_000);
++        expect((await vpsComputerAction("provision", cfg, BOT_ID)).ready).toBe(true);
++      }
++      expect(inspections()).toBe(1);
++
++      // The ceiling still forces one full inspection, whatever the probes answered.
++      await vi.advanceTimersByTimeAsync(10 * 60_000);
+       expect((await vpsComputerAction("provision", cfg, BOT_ID)).ready).toBe(true);
+       expect(inspections()).toBe(2);
+     } finally {
+diff --git a/server/vps-computer.ts b/server/vps-computer.ts
+index 9ea02cdac..36eedbebe 100644
+--- a/server/vps-computer.ts
++++ b/server/vps-computer.ts
+@@ -97,11 +97,14 @@ function invalidateVpsStatus(key: string): void {
+ 
+ // A ready desktop outlives a turn: re-checking the whole container on every message cost seconds and
+ // never found anything, because the container and the driver stay up between turns. A lease remembers
+-// the verified state for a few minutes; a cheap driver probe every minute proves the same container is
+-// still answering, so a replaced or stopped container is noticed long before the lease expires.
+-const DESKTOP_LEASE_TTL_MS = 3 * 60_000;
++// the verified state, and a cheap driver probe every minute proves the same container is still
++// answering; each answer renews the lease, so a turn pays nothing while the desktop keeps answering.
++// A hard ceiling still forces one full inspection every half hour, so nothing rides on a single
++// reading for a whole session.
++const DESKTOP_LEASE_TTL_MS = 10 * 60_000;
++const DESKTOP_LEASE_MAX_MS = 30 * 60_000;
+ const DESKTOP_LEASE_PROBE_AFTER_MS = 60_000;
+-type DesktopLease = { status: VpsComputerStatus; verifiedAt: number; expiresAt: number };
++type DesktopLease = { status: VpsComputerStatus; verifiedAt: number; expiresAt: number; ceilingAt: number };
+ const desktopLeases = new Map<string, DesktopLease>();
+ 
+ function grantDesktopLease(key: string, status: VpsComputerStatus): void {
+@@ -110,7 +113,12 @@ function grantDesktopLease(key: string, status: VpsComputerStatus): void {
+     return;
+   }
+   const now = Date.now();
+-  desktopLeases.set(key, { status, verifiedAt: now, expiresAt: now + DESKTOP_LEASE_TTL_MS });
++  desktopLeases.set(key, {
++    status,
++    verifiedAt: now,
++    expiresAt: now + DESKTOP_LEASE_TTL_MS,
++    ceilingAt: now + DESKTOP_LEASE_MAX_MS,
++  });
+ }
+ 
+ function dropDesktopLease(key: string): void {
+@@ -147,7 +155,14 @@ async function leasedDesktopStatus(
+     desktopLeases.delete(key);
+     return null;
+   }
+-  lease.verifiedAt = Date.now();
++  const now = Date.now();
++  if (now >= lease.ceilingAt) {
++    // Past the ceiling the probe has done its job: inspect in full, which also re-grants the lease.
++    desktopLeases.delete(key);
++    return null;
++  }
++  lease.verifiedAt = now;
++  lease.expiresAt = now + DESKTOP_LEASE_TTL_MS;
+   return lease.status;
+ }
+ 

@@ -97,11 +97,14 @@ function invalidateVpsStatus(key: string): void {
 
 // A ready desktop outlives a turn: re-checking the whole container on every message cost seconds and
 // never found anything, because the container and the driver stay up between turns. A lease remembers
-// the verified state for a few minutes; a cheap driver probe every minute proves the same container is
-// still answering, so a replaced or stopped container is noticed long before the lease expires.
-const DESKTOP_LEASE_TTL_MS = 3 * 60_000;
+// the verified state, and a cheap driver probe every minute proves the same container is still
+// answering; each answer renews the lease, so a turn pays nothing while the desktop keeps answering.
+// A hard ceiling still forces one full inspection every half hour, so nothing rides on a single
+// reading for a whole session.
+const DESKTOP_LEASE_TTL_MS = 10 * 60_000;
+const DESKTOP_LEASE_MAX_MS = 30 * 60_000;
 const DESKTOP_LEASE_PROBE_AFTER_MS = 60_000;
-type DesktopLease = { status: VpsComputerStatus; verifiedAt: number; expiresAt: number };
+type DesktopLease = { status: VpsComputerStatus; verifiedAt: number; expiresAt: number; ceilingAt: number };
 const desktopLeases = new Map<string, DesktopLease>();
 
 function grantDesktopLease(key: string, status: VpsComputerStatus): void {
@@ -110,7 +113,12 @@ function grantDesktopLease(key: string, status: VpsComputerStatus): void {
     return;
   }
   const now = Date.now();
-  desktopLeases.set(key, { status, verifiedAt: now, expiresAt: now + DESKTOP_LEASE_TTL_MS });
+  desktopLeases.set(key, {
+    status,
+    verifiedAt: now,
+    expiresAt: now + DESKTOP_LEASE_TTL_MS,
+    ceilingAt: now + DESKTOP_LEASE_MAX_MS,
+  });
 }
 
 function dropDesktopLease(key: string): void {
@@ -147,7 +155,14 @@ async function leasedDesktopStatus(
     desktopLeases.delete(key);
     return null;
   }
-  lease.verifiedAt = Date.now();
+  const now = Date.now();
+  if (now >= lease.ceilingAt) {
+    // Past the ceiling the probe has done its job: inspect in full, which also re-grants the lease.
+    desktopLeases.delete(key);
+    return null;
+  }
+  lease.verifiedAt = now;
+  lease.expiresAt = now + DESKTOP_LEASE_TTL_MS;
   return lease.status;
 }
 

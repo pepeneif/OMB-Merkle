@@ -35,7 +35,7 @@ const LINES: Record<string, number> = {
   "src/components/CursorAvatar.tsx": 1324,
   "server/skills.ts": 1379,
   "server/composio.ts": 1038,
-  "server/vps-computer.ts": 1369, // port 013 +2 (naming); port 018 desktop lease +80
+  "server/vps-computer.ts": 1384, // port 013 +2 (naming); port 018 lease +80; port 019 lease renewal +15
   "scripts/mcp-server.ts": 1411,
   "server/boat.ts": 1253,
   "server/drivers/pi.ts": 1033,
