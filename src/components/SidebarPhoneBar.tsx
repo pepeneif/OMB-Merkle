@@ -1,4 +1,4 @@
-import { CalendarDays, FolderOpen, LayoutGrid, Network, Puzzle, Rocket, Search, X, Zap } from "lucide-react";
+import { CalendarDays, FolderOpen, LayoutGrid, Network, Puzzle, Search, X, Zap } from "lucide-react";
 
 import { useCloudFilesReady } from "@/lib/cloud-files";
 import { t } from "@/lib/i18n";
@@ -45,13 +45,6 @@ export function SidebarPhoneBar({ query, onQuery }: { query: string; onQuery: (q
       active: state.activeView === "files",
       onSelect: () => dispatch({ type: "showFiles" }),
     }] : []),
-    {
-      key: "published-apps",
-      label: t("sidebar.nav.publishedApps"),
-      icon: <Rocket size={18} />,
-      active: state.activeView === "published-apps",
-      onSelect: () => dispatch({ type: "showPublishedApps" }),
-    },
     {
       key: "apps",
       label: t("sidebar.nav.apps"),

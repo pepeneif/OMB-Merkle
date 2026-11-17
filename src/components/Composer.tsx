@@ -49,6 +49,7 @@ import { useOnCall } from "@/lib/call";
 import { isLiveCallRunning, useLiveMedia } from "@/lib/live-call-media";
 import {
   appendPastedText,
+  clipboardFilesToAttach,
   clipboardHasImages,
   clipboardImageFiles,
   composeMessage,
@@ -83,6 +84,7 @@ import {
   composerCanSteerQueuedMessages,
   doubleEnterSteerWindowExpiresAt,
   doubleEnterSteersQueue,
+  roomSteersQueued,
 } from "./ComposerQueuedMessages";
 import { skillAuthoringEnabled } from "@/lib/feature-flags";
 import { mentionChoicesForQuery, mentionQueryAt } from "@/lib/mentions"; import { mentionPicksFor, restoreMentionPicks } from "@/lib/mention-picks";
@@ -423,6 +425,7 @@ export function Composer({
     pendingCount,
     blocking,
   );
+  const roomSteers = Boolean(group) && roomSteersQueued(canSteer, groupBusyBotId);
   const [steering, setSteering] = useState(false);
   const interruptTurn = () => {
     if (group) dispatch({ type: "interruptGroup", groupId: group.id, threadId });
@@ -433,10 +436,9 @@ export function Composer({
     if (!queueHeadId) return;
     setSteering(true);
     const settle = () => setSteering(false);
-    if (group && canSteer) {
-      dispatch({ type: "steerGroupQueued", groupId: group.id, threadId, queueId: queueHeadId, onError: settle, onSettled: settle });
-    } else if (group) {
-      dispatch({ type: "interruptGroup", groupId: group.id, threadId, onError: settle });
+    if (group) {
+      if (roomSteers) dispatch({ type: "steerGroupQueued", groupId: group.id, threadId, queueId: queueHeadId, onError: settle, onSettled: settle });
+      else settle();
     } else if (bot && canSteer) {
       dispatch({ type: "steerQueued", botId: bot.id, threadId, queueId: queueHeadId, onError: settle, onSettled: settle });
     } else if (bot) {
@@ -471,11 +473,11 @@ export function Composer({
       prevPendingCountRef.current,
       pendingCount,
       busy,
-      canSteer,
+      group ? roomSteers : canSteer,
     );
     if (expiresAt !== null) steerAgainUntilRef.current = expiresAt;
     prevPendingCountRef.current = pendingCount;
-  }, [pendingCount, busy, canSteer]);
+  }, [pendingCount, busy, canSteer, group, roomSteers]);
   useEffect(() => {
     if (!busy || pendingCount === 0) {
       setSteering(false);
@@ -490,7 +492,7 @@ export function Composer({
   const modeBot = group ? undefined : bot;
   const { choice: approvalChoice, dialogs: approvalDialogs } = useThreadApproval(modeBot);
   const uploadImage = useCallback((file: File) => uploadDraftImage(draftId, file), [draftId]);
-  const pickFiles = async (picked: FileList | null) => {
+  const pickFiles = async (picked: FileList | readonly File[] | null) => {
     if (!picked?.length) return;
     changeDraftAttachmentPending(draftId, true);
     try {
@@ -581,6 +583,7 @@ export function Composer({
       channelMode: effectiveChannelMode, mentions: picks.ids(body), followUp,
     };
     if (group) {
+      const points = effectiveChannelMode === "goal" ? null : takePointedChips(threadId);
       dispatch({
         type: "sendGroup",
         groupId: group.id,
@@ -589,7 +592,8 @@ export function Composer({
         replyToId: replyTo?.id,
         threadId,
         mode: effectiveChannelMode, mentions: sentDraft.mentions,
-        onError: () => restoreDraft(sentDraft),
+        ...(points ? { pointed: points.pointed } : {}),
+        onError: () => { points?.restore(); restoreDraft(sentDraft); },
       });
       roomMessageSent(effectiveChannelMode, busy);
     } else if (bot) {
@@ -609,6 +613,12 @@ export function Composer({
   };
 
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const pastedFiles = clipboardFilesToAttach(e.clipboardData);
+    if (pastedFiles.length > 0) {
+      e.preventDefault();
+      void pickFiles(pastedFiles);
+      return;
+    }
     const imageFiles = clipboardImageFiles(e.clipboardData);
     if (imageFiles.length > 0 || clipboardHasImages(e.clipboardData)) {
       e.preventDefault();
@@ -762,7 +772,7 @@ export function Composer({
             />
           </div>
         )}
-        {!group && <PointedChips threadId={threadId} />}{!group && bot && <SetupRequestChip bot={bot} threadId={threadId} />}
+        <PointedChips threadId={threadId} />{!group && bot && <SetupRequestChip bot={bot} threadId={threadId} />}
         <ComposerAttachments
           items={attachments}
           onAdd={addAttachments}
@@ -779,8 +789,9 @@ export function Composer({
           items={queuedMessages}
           oneThreadPerBot={state.config?.cloudStarter === true}
           onSeePlans={() => dispatch({ type: "toggleAppSettings", open: true, section: "cloudAccount" })}
-          onSteer={canSteerQueued ? steerQueued : undefined}
-          steerInterrupts={!canSteer}
+          onSteer={canSteerQueued && (!group || roomSteers) ? steerQueued : undefined}
+          steerInterrupts={!group && !canSteer}
+          held={Boolean(group) && busy && !roomSteers}
           steerMode={group ? "next" : "all"}
           steering={steering}
           onCancel={(queueId) => {
@@ -797,7 +808,7 @@ export function Composer({
             data-composer-backdrop
             className={cn("pointer-events-none absolute -left-5 -right-5 bg-app", advanced ? "-bottom-3 top-1/2" : cn("top-0", simpleDock ? "-bottom-4" : "-bottom-3"))}
           />
-        <div ref={shellRef} data-tour="composer" data-multiline={multiline ? "" : undefined} className={cn("@container/composer relative z-[1]", singleRow ? "flex items-end gap-2" : simpleDock ? cn(SIMPLE_COMPOSER, multiline ? "rounded-[18px]" : "rounded-[22px]") : cn("rounded-2xl px-2 py-1.5", ELEVATED_FLOAT))}>
+        <div ref={shellRef} data-tour="composer" data-look="composer" data-multiline={multiline ? "" : undefined} className={cn("@container/composer relative z-[1]", singleRow ? "flex items-end gap-2" : simpleDock ? cn(SIMPLE_COMPOSER, multiline ? "rounded-[18px]" : "rounded-[22px]") : cn("rounded-2xl px-2 py-1.5", ELEVATED_FLOAT))}>
         {singleRow && !locked && (
           <div className="flex shrink-0 items-center">
             <PhonePlus
@@ -965,7 +976,7 @@ export function Composer({
             if (sendsMessage(e.nativeEvent, sendKey)) {
               e.preventDefault();
               if (
-                canSteer &&
+                (group ? roomSteers : canSteer) &&
                 doubleEnterSteersQueue(steerAgainUntilRef.current, Date.now(), pendingCount, hasContent)
               ) {
                 steerAgainUntilRef.current = 0;

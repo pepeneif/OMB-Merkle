@@ -3,7 +3,7 @@
   "name": "Publish to Netlify",
   "version": "1.0.0",
   "description": "Put a site or web app online at a public link, on the hosting a Cloud plan includes or on the person's own Netlify account.",
-  "defaultEnabled": true,
+  "defaultEnabled": false,
   "triggerTerms": [
     "netlify",
     "deploy the site",

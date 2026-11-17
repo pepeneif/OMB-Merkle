@@ -40,7 +40,7 @@ describe("publish-to-netlify skill guide", () => {
   const ids = (text: string) => selectBundledSkills(text, [], skills).map((entry) => entry.manifest.id);
 
   it("is a valid skill that the scanner has nothing to say about", () => {
-    expect(skill?.manifest.defaultEnabled).toBe(true);
+    expect(skill?.manifest.defaultEnabled).toBe(false);
     const parsed = parseSkillMd(guide);
     expect(parsed).toMatchObject({ name: "publish-to-netlify" });
     expect(scanSkillText(guide)).toEqual([]);
@@ -63,13 +63,13 @@ describe("publish-to-netlify skill guide", () => {
     }
   });
 
-  it("mounts when a bot is asked to put a site or app online, and not for a page or a report", () => {
+  // Merkle fork: this server has no included app hosting, and the skill's 13 KB of
+  // instructions were injected on ordinary "web app" / "make a website" requests.
+  // It ships disabled, so no request mounts it; the helper stays for a person who
+  // turns it on in Bot Settings.
+  it("stays off for every request while it ships disabled", () => {
     for (const text of ["Deploy this to Netlify", "build me a todo web app and deploy it", "make a website for my bakery", "publish the site so customers can see it",
-      "turn this into a live app", "can you host it somewhere?"]) {
-      expect(ids(text), text).toContain("publish-to-netlify");
-    }
-    for (const text of ["summarise this report", "make a dashboard of last month's sales", "check the competitor's website for prices", "publish this page", "what's on my calendar",
-      "deploy the API to Fly", "redeploy the worker and check the deployment logs"]) {
+      "turn this into a live app", "can you host it somewhere?", "summarise this report", "make a dashboard of last month's sales"]) {
       expect(ids(text), text).not.toContain("publish-to-netlify");
     }
   });

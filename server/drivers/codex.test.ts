@@ -2,7 +2,8 @@ import { createHash } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { once } from "node:events";
 import { spawn } from "node:child_process";
-import { createConnection } from "node:net";
+import { createConnection, type AddressInfo } from "node:net";
+import { createServer } from "node:http";
 import { createInterface } from "node:readline";
 import { tmpdir } from "node:os";
 import { dirname, join, sep } from "node:path";
@@ -18,6 +19,7 @@ import { publishedMessages, replyProblems } from "../harness/text-items.testkit.
 import { caseTokens, LIVE_REPLY_CASES, liveReplyScripts } from "../testing/live-reply-cases.ts";
 import { CodexDriver, codexNativeIncomingLogMessage, codexUpdateCommand } from "./codex.ts";
 import { codexCliOverrides } from "./codex-process.ts";
+import { codexReleaseUpdate } from "./codex-update.ts";
 import { parseToml } from "../toml-lite.ts";
 import * as codexProcess from "./codex-process.ts";
 import { CODEX_SIGN_IN_EXPIRED, codexLimitFacts, codexNotSignedIn, codexSignInRefused, codexUserError } from "./codex-errors.ts";
@@ -27,6 +29,10 @@ import { TEAM_TOOLS_FAILED } from "./team-tools.ts";
 import { unsupportedCallsNotice } from "./codex-unsupported-calls.ts";
 import { rebuiltSessionNotice } from "../resume-recovery.ts";
 import { startFakeHttpMcp, type FakeHttpMcp } from "../testing/fake-http-mcp-server.ts";
+import { OWN_MCP_HTTP_ENV } from "./own-mcp-http.ts";
+import { ownMcpHttpRoutes } from "../routes/own-mcp-http.ts";
+import { json as sendJson, readBody } from "../harness/http.ts";
+import type { RequestAuth } from "../request-auth.ts";
 import * as procs from "../procs.ts";
 import { botBox } from "../bot-box/box.ts";
 import { boxEnvironment } from "../bot-box/env.ts";
@@ -559,6 +565,7 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
     delete process.env.FAKE_CODEX_RESOLVED_SANDBOX;
     delete process.env.FAKE_CODEX_MCP_START;
     delete process.env.FAKE_CODEX_MCP_HANDSHAKE;
+    vi.unstubAllEnvs();
     delete process.env.FAKE_CODEX_STEER_ERROR;
     delete process.env.FAKE_CODEX_STEER_ERROR_FILE;
     delete process.env.FAKE_CODEX_STEER_HANG;
@@ -1228,6 +1235,9 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
 
   it("uses the instance environment for the Codex process", async () => {
     const codexHome = join(scratch, "custom-codex-home");
+    // Signed in with a login file: MausBot keeps the person's home when it has none (the login may be in the keyring).
+    mkdirSync(codexHome, { recursive: true });
+    writeFileSync(join(codexHome, "auth.json"), "{}");
     await create({ environment: { CODEX_HOME: codexHome } });
     const dump = join(scratch, "environment.json");
     process.env.FAKE_CODEX_DUMP = dump;
@@ -1235,7 +1245,12 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
     await instance.adapter.sendTurn({ threadId: "t-environment", text: "hi" });
     await recorder.until((event) => event.type === "turn.completed");
 
-    expect(JSON.parse(readFileSync(dump, "utf8")).env.CODEX_HOME).toBe(codexHome);
+    // The turn runs in MausBot's own Codex home, with the instance's Codex home linked in but its chats kept apart.
+    const { env } = JSON.parse(readFileSync(dump, "utf8"));
+    expect(env.CODEX_HOME.startsWith(join(DATA_DIR, "providers", "codex-own") + sep)).toBe(true);
+    expect(env.CODEX_SQLITE_HOME).toBe(env.CODEX_HOME);
+    expect(realpathSync(join(env.CODEX_HOME, "skills"))).toBe(realpathSync(join(codexHome, "skills")));
+    expect(existsSync(join(codexHome, "sessions"))).toBe(false);
   });
 
   it("mounts connected apps without placing credential values in argv", async () => {
@@ -1935,7 +1950,8 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
     expect(seen.env.HEALTH_REGION).toBe("eu");
   });
 
-  it.each(["ask", "auto"] as const)("pre-allows peer-agent comms without exposing its token in %s mode", async (approvalMode) => {
+  it.each([["ask", "0"], ["auto", "0"], ["ask", "1"], ["auto", "1"]] as const)("pre-allows peer-agent comms without exposing its token in %s mode (OMB_OWN_MCP_HTTP=%s)", async (approvalMode, http) => {
+    vi.stubEnv(OWN_MCP_HTTP_ENV, http);
     await create();
     const dump = join(scratch, "agents.json");
     process.env.FAKE_CODEX_DUMP = dump;
@@ -1954,7 +1970,6 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
             OMB_BOT_ID: "captain",
             OMB_THREAD_ID: "t-agents",
             OMB_COMMS_TOKEN: "peer-comms-secret",
-            OMB_TURN_DEPTH: "0",
           },
         },
       },
@@ -1962,14 +1977,47 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
     await recorder.until((event) => event.type === "turn.completed");
 
     const seen = JSON.parse(readFileSync(dump, "utf8"));
-    expect(seen.argv.join(" ")).toContain("mcp_servers.agents.command");
+    expect(seen.argv.join(" ")).toContain(http === "1" ? 'mcp_servers.agents.url="http://127.0.0.1:8799/api/internal/mcp-http/agents"' : "mcp_servers.agents.command");
     expect(seen.argv).toContain('mcp_servers.agents.default_tools_approval_mode="approve"');
     expect(seen.argv).toContain("mcp_servers.agents.tool_timeout_sec=960");
-    expect(seen.argv.join(" ")).toContain("/tmp/agents-proxy.js");
+    if (http === "1") expect(seen.argv).toContain('mcp_servers.agents.bearer_token_env_var="OMB_COMMS_TOKEN"');
+    else expect(seen.argv.join(" ")).toContain("/tmp/agents-proxy.js");
     expect(seen.argv.join(" ")).toContain("OMB_COMMS_TOKEN");
     expect(seen.argv.join(" ")).not.toContain("peer-comms-secret");
     expect(seen.env.OMB_COMMS_TOKEN).toBe("peer-comms-secret");
     expect(instance.adapter.capabilities.agentsMcp).toBe(true);
+  });
+
+  it("with OMB_OWN_MCP_HTTP=1, starts the agents server by URL with the bot's settings and capability, the loopback out of any proxy", async () => {
+    vi.stubEnv(OWN_MCP_HTTP_ENV, "1");
+    const seenAuth: Array<string | undefined> = [];
+    const harness = createServer(async (req, res) => {
+      const url = new URL(req.url ?? "/", "http://127.0.0.1");
+      seenAuth.push(req.headers.authorization);
+      await ownMcpHttpRoutes({ req, res, url, path: url.pathname, method: req.method ?? "GET", auth: {} as RequestAuth, json: sendJson, readBody });
+      if (!res.headersSent) sendJson(res, 404, { error: "no such endpoint" });
+    });
+    await new Promise<void>((resolve) => harness.listen(0, "127.0.0.1", resolve));
+    try {
+      process.env.FAKE_CODEX_MCP_START = "1";
+      // Codex given a proxy for HTTP must reach this server's loopback URL around it.
+      await create({ environment: { NO_PROXY: "corp.internal" } });
+      const dump = join(scratch, "agents-http.json");
+      process.env.FAKE_CODEX_DUMP = dump;
+      await instance.adapter.sendTurn({ threadId: "t-agents-http", text: "go", integrations: { agents: { command: process.execPath, args: ["/tmp/agents-proxy.js"], env: {
+        ELECTRON_RUN_AS_NODE: "1", OMB_HARNESS_URL: `http://127.0.0.1:${(harness.address() as AddressInfo).port}`, OMB_BOT_ID: "captain", OMB_THREAD_ID: "t-agents-http",
+        OMB_COMMS_TOKEN: "peer-comms-secret", OMB_CHIEF_OF_STAFF: "1",
+      } } } });
+      expect(await recorder.until((event) => event.type === "turn.completed")).toMatchObject({ ok: true });
+      const seen = JSON.parse(readFileSync(dump, "utf8"));
+      expect(seen.mcpStartup.agents).toMatchObject({ status: "ready", tools: expect.arrayContaining(["coordinate_bots", "create_bot"]) });
+      expect(seenAuth.length).toBeGreaterThan(0);
+      expect(seenAuth.every((authorization) => authorization === "Bearer peer-comms-secret")).toBe(true);
+      expect(seen.env.NO_PROXY.split(",")).toEqual(["corp.internal", "127.0.0.1", "localhost", "::1"]);
+      expect(seen.argv.join(" ")).not.toContain("peer-comms-secret");
+    } finally {
+      await new Promise<void>((resolve) => harness.close(() => resolve()));
+    }
   });
 
   it.each(["ask", "auto"] as const)("pre-allows the built-in browser while preserving the native %s reviewer", async (approvalMode) => {
@@ -1999,6 +2047,7 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
     expect(seen.argv).toContain("features.browser_use=false");
     expect(seen.argv).toContain("features.browser_use_external=false");
     expect(seen.argv).toContain("features.computer_use=false");
+    expect(seen.argv).toContain("features.plugins=false");
     expect(seen.argv.some((arg: string) => arg.startsWith("web_search="))).toBe(false);
     expect(seen.argv).toContain('plugins={ "browser@openai-bundled" = { enabled = false }, "computer-use@openai-bundled" = { enabled = false }, "unified-computer-use@openai-bundled" = { enabled = false } }');
     expect(seen.argv).toContain('mcp_servers.browser.default_tools_approval_mode="auto"');
@@ -2228,6 +2277,10 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
     });
     vi.stubEnv("OPENMAUSBOT_CHATGPT_TOKEN", "inherited-token-must-not-leak");
     vi.stubEnv("OPENAI_API_KEY", "inherited-api-key-must-not-leak");
+    if (!Object.keys(opts).length) {
+      mkdirSync(join(scratch, ".codex"), { recursive: true });
+      writeFileSync(join(scratch, ".codex", "auth.json"), "{}");
+    }
     await create({ ...opts, mode: "resume", environment: { HOME: scratch, USERPROFILE: scratch, CODEX_HOME: join(scratch, ".codex") } });
     const dump = join(scratch, "model-provider-resume.json");
     process.env.FAKE_CODEX_DUMP = dump;
@@ -2259,10 +2312,15 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
       if (plan) {
         expect(seen.env.CODEX_HOME.startsWith(join(DATA_DIR, "providers", "chatgpt-plan") + sep)).toBe(true);
         expect(seen.env.CODEX_HOME).not.toBe(join(scratch, ".codex"));
-        // The plan signs in on its own home; the person's Codex skills, settings and sessions are linked in.
+        // The plan signs in on its own home; the person's Codex skills and settings are linked in, never their chats.
         expect(realpathSync(join(seen.env.CODEX_HOME, "skills"))).toBe(realpathSync(join(scratch, ".codex", "skills")));
         expect(seen.argv.some((arg: string) => arg.startsWith("shell_environment_policy.exclude="))).toBe(false);
-      } else expect(seen.env.CODEX_HOME).toBe(join(scratch, ".codex"));
+      } else if (Object.keys(opts).length) expect(seen.env.CODEX_HOME).toBe(join(scratch, ".codex"));
+      else {
+        // A turn on the person's own login keeps its chats in MausBot's own Codex home, with their login linked in.
+        expect(seen.env.CODEX_HOME.startsWith(join(DATA_DIR, "providers", "codex-own") + sep)).toBe(true);
+        expect(realpathSync(join(seen.env.CODEX_HOME, "skills"))).toBe(realpathSync(join(scratch, ".codex", "skills")));
+      }
       const threadCalls = seen.calls.filter((call: { method: string }) => ["thread/start", "thread/resume"].includes(call.method));
       expect(threadCalls).toHaveLength(1);
       if (plan) expect(threadCalls[0].params.config["shell_environment_policy.exclude"]).toEqual(["OPENMAUSBOT_CHATGPT_TOKEN"]);
@@ -3506,12 +3564,18 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
     });
   });
 
-  it("counts an API-key login as signed in", async () => {
+  it("counts an API-key login as signed in, marked as an API key so Settings offers no ChatGPT sign-out", async () => {
     await create({ mode: "api-key-configured" });
     await expect(instance.snapshot()).resolves.toMatchObject({
       state: "available",
       authenticated: true,
+      account: { method: "api-key" },
     });
+  });
+
+  it("does not mark a ChatGPT login as an API key", async () => {
+    await create({ mode: "logged-in-stdout" });
+    expect((await instance.snapshot()).account?.method).toBeUndefined();
   });
 
   it("also accepts login status from older Codex versions that used stdout", async () => {
@@ -3603,6 +3667,12 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
     expect(codexUpdateCommand("'C:\\Program Files\\ag.exe' codex", "win32")).toBe(
       "& 'C:\\Program Files\\ag.exe' 'codex' update",
     );
+  });
+
+  it("shows no update card on My Cloud, whose Codex updates with the Cloud", async () => {
+    expect(await codexReleaseUpdate("0.150.0", "codex", false)).toMatchObject({ title: "Update Codex to 0.156.1", command: "codex update" });
+    expect(await codexReleaseUpdate("0.150.0", "codex", true)).toBeUndefined();
+    expect(await codexReleaseUpdate("0.156.1", "codex", true)).toBeUndefined();
   });
 
   it("marks a Codex 401 as setup so the UI offers sign-in instead of Retry", async () => {
@@ -4173,5 +4243,37 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
     const seen = JSON.parse(readFileSync(dump, "utf8"));
     const turnStart = seen.calls.find((c: any) => c.method === "turn/start");
     expect(turnStart.params).not.toHaveProperty("effort");
+  });
+
+  it("runs a Fast row on its base model with the Fast tier for that turn only", async () => {
+    await create();
+    const dump = join(scratch, "fast.json");
+    process.env.FAKE_CODEX_DUMP = dump;
+
+    await instance.adapter.sendTurn({ threadId: "t-fast", text: "hi", model: "gpt-5.5+priority", effort: "high" });
+    await recorder.until((e) => e.type === "turn.completed");
+
+    const seen = JSON.parse(readFileSync(dump, "utf8"));
+    const threadStart = seen.calls.find((c: any) => c.method === "thread/start");
+    const turnStart = seen.calls.find((c: any) => c.method === "turn/start");
+    expect(threadStart.params).toMatchObject({ model: "gpt-5.5", modelProvider: "openai" });
+    expect(threadStart.params).not.toHaveProperty("serviceTier");
+    expect(turnStart.params).toMatchObject({ serviceTierForTurn: "priority", effort: "high" });
+    expect(turnStart.params).not.toHaveProperty("serviceTier");
+  });
+
+  it("sends no service tier for a plain row", async () => {
+    await create();
+    const dump = join(scratch, "plain.json");
+    process.env.FAKE_CODEX_DUMP = dump;
+
+    await instance.adapter.sendTurn({ threadId: "t-plain", text: "hi", model: "gpt-5.5" });
+    await recorder.until((e) => e.type === "turn.completed");
+
+    const seen = JSON.parse(readFileSync(dump, "utf8"));
+    const turnStart = seen.calls.find((c: any) => c.method === "turn/start");
+    expect(seen.calls.find((c: any) => c.method === "thread/start").params.model).toBe("gpt-5.5");
+    expect(turnStart.params).not.toHaveProperty("serviceTierForTurn");
+    expect(turnStart.params).not.toHaveProperty("serviceTier");
   });
 });
