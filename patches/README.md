@@ -44,6 +44,8 @@ Cada parche se genera con `git diff --binary` del commit correspondiente del for
 | 015 | `015-v165-coordinacion-sin-duplicar.patch` | Coordinacion del Chief: fusiona el parrafo de equipos con la regla del SOUL (un solo lugar para "presenta el bot y su modelo"), parte el bloque de delegacion en entrega y retorno, y quita repeticiones ("one point of contact" dos veces, el manejo del resultado del tool duplicado) | v165 (2026-11-17) | `server/chief-of-staff.ts` (+ prueba) |
 | 016 | `016-v165-riel-menos-hueco-y-letra-mensajes.patch` | Riel colapsado: quita la banda muerta de 24 px del vidrio, encoge el bloque de iconos y deja 4 px entre ellos, para que quepa un avatar mas; letra de las burbujas 15/22 a 17/25 (el compositor se queda en 15 px) | v165 (2026-11-17) | `src/components/Sidebar.tsx`, `src/components/SidebarFooter.tsx`, `src/components/SidebarFooterNav.tsx`, `src/components/chat-bubble.ts`, `src/components/ChatView.tsx`, `src/components/GroupView.tsx`, `src/components/BubbleEditor.tsx`, `src/styles.css` (+ pruebas) |
 
+| 017 | `017-v165-tablas-columnas-numericas.patch` | Tablas del chat: el boton de ordenar va antes del rotulo cuando la columna es de numeros (alineado con las cifras) y despues cuando es de texto; todas las columnas numericas comparten un ancho calculado del valor mas largo; en tablas de 2 a 4 columnas todas van iguales; y el menos tipografico (U+2212) cuenta como signo, asi una columna con -200.00 se reconoce como numerica | v165 (2026-11-17) | `src/components/RichTable.tsx`, `src/components/MarkdownTable.tsx`, `src/lib/table-data.ts` (+ pruebas) |
+
 ## Notas
 
 - El 014 va despues del 013, no comparte archivos con los anteriores y no depende de su orden.
@@ -52,6 +54,9 @@ Cada parche se genera con `git diff --binary` del commit correspondiente del for
 - El 016 va despues del 015. Toca la barra lateral y la tipografia del chat; ninguno de esos
   archivos lo toca el 015. `ChatView.conversational.test.ts` fija `text-[17px]` y `leading-[25px]`:
   si otro parche cambia la burbuja, este va despues.
+- El 017 va despues del 016. Toca las tablas (`RichTable`, `MarkdownTable`) y el lector de cifras
+  (`table-data`); ningun otro parche toca esos archivos. `MarkdownTable` pide columnas iguales en
+  tablas de 2 a 4 columnas: si otro parche cambia el dibujo de tablas, este va despues.
 - Los parches 002, 003 y 006 tocan varios archivos en comun (`ChatView.tsx`, `ChatMoreMenu.tsx`):
   van en el mismo orden en que se hicieron, por eso aplican limpio en secuencia. Aplicarlos
   sueltos o en otro orden puede fallar.
