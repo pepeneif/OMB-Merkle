@@ -1,0 +1,150 @@
+diff --git a/src/components/BubbleEditor.tsx b/src/components/BubbleEditor.tsx
+index b10bacaee..a4589b3aa 100644
+--- a/src/components/BubbleEditor.tsx
++++ b/src/components/BubbleEditor.tsx
+@@ -55,7 +55,7 @@ export function BubbleEditor({
+           if (e.key === "Escape") onCancel();
+         }}
+         rows={Math.min(10, Math.max(2, draft.split("\n").length))}
+-        className={cn("w-full resize-none bg-transparent text-ink focus:outline-none", simple ? "leading-[22px]" : "text-[15px] leading-relaxed")}
++        className={cn("w-full resize-none bg-transparent text-ink focus:outline-none", simple ? "leading-[25px]" : "text-[17px] leading-relaxed")}
+       />
+       <div className="mt-2 flex items-center justify-end gap-2">
+         <button
+diff --git a/src/components/ChatView.conversational.test.ts b/src/components/ChatView.conversational.test.ts
+index 9c125fc93..8019c9c40 100644
+--- a/src/components/ChatView.conversational.test.ts
++++ b/src/components/ChatView.conversational.test.ts
+@@ -75,7 +75,7 @@ describe("conversational replies", () => {
+     const bubbles = [...document.querySelectorAll<HTMLElement>("[data-reply-segment]")];
+     expect(bubbles).toHaveLength(3);
+     expect(bubbles.every((el) => !el.classList.contains("reply-bubble-in"))).toBe(true);
+-    for (const el of bubbles) expect([...el.classList]).toEqual(expect.arrayContaining(["bg-card", "rounded-[18px]", "px-3", "text-[15px]", "leading-[22px]", "min-w-9"]));
++    for (const el of bubbles) expect([...el.classList]).toEqual(expect.arrayContaining(["bg-card", "rounded-[18px]", "px-3", "text-[17px]", "leading-[25px]", "min-w-9"]));
+     expect([...bubbles[0]!.classList]).toContain("rounded-es-[6px]");
+     expect([...bubbles[1]!.classList]).toEqual(expect.arrayContaining(["rounded-ss-[6px]", "rounded-es-[6px]"]));
+     expect([...bubbles[2]!.classList]).toContain("rounded-ss-[6px]");
+diff --git a/src/components/ChatView.tsx b/src/components/ChatView.tsx
+index 37029c46c..f98b8e976 100644
+--- a/src/components/ChatView.tsx
++++ b/src/components/ChatView.tsx
+@@ -456,7 +456,7 @@ const Bubble = memo(function Bubble({
+           data-chat-bubble={simple ? "simple" : ""} data-look={user ? "user-bubble" : "bot-bubble"}
+           className={cn(
+             tabled ? "w-full" : "w-fit",
+-            simple ? !tabled && SIMPLE_BUBBLE_MAX : "max-w-[min(var(--chat-bubble-max),var(--chat-bubble-pct))] rounded-2xl text-[15px] leading-relaxed",
++            simple ? !tabled && SIMPLE_BUBBLE_MAX : "max-w-[min(var(--chat-bubble-max),var(--chat-bubble-pct))] rounded-2xl text-[17px] leading-relaxed",
+             !simple && "bbl",
+             !simple && (user ? "bbl-user" : "bbl-bot"),
+             emerging && !streamedReply(message.id) && "turn-answer",
+diff --git a/src/components/GroupView.tsx b/src/components/GroupView.tsx
+index 51c613ffb..eaea30b7c 100644
+--- a/src/components/GroupView.tsx
++++ b/src/components/GroupView.tsx
+@@ -223,7 +223,7 @@ function RoomTextMessage({
+           data-chat-bubble={simple ? "simple" : ""} data-look={user ? "user-bubble" : "bot-bubble"}
+           className={cn(
+             tabled ? "w-full" : "w-fit",
+-            simple ? cn(!tabled && SIMPLE_BUBBLE_MAX, SIMPLE_BUBBLE_TEXT) : "max-w-[min(var(--chat-bubble-max),var(--chat-bubble-pct))] rounded-2xl text-[15px] leading-relaxed",
++            simple ? cn(!tabled && SIMPLE_BUBBLE_MAX, SIMPLE_BUBBLE_TEXT) : "max-w-[min(var(--chat-bubble-max),var(--chat-bubble-pct))] rounded-2xl text-[17px] leading-relaxed",
+             !user && emerging && !streamedReply(m.id) && "turn-answer",
+             tabled || (!user && !m.text?.trim() && !m.replyToId && m.attachments?.length)
+               ? "text-ink"
+diff --git a/src/components/Sidebar.tsx b/src/components/Sidebar.tsx
+index d99cf48ac..d0351757c 100644
+--- a/src/components/Sidebar.tsx
++++ b/src/components/Sidebar.tsx
+@@ -1265,7 +1265,7 @@ export const Sidebar = memo(function Sidebar({ open, onClose, collapseToIcons =
+         open ? "max-md:translate-x-0" : "max-md:-translate-x-full",
+       )}
+     >
+-      <GlassScrollFrame className="flex-1" fade={!advanced}><PlaceTint />
++      <GlassScrollFrame className="flex-1 [--glass-reach:0px]" fade={!advanced}><PlaceTint />
+       <GlassBar edge="top">
+       <div
+         data-sidebar-top-row={corner ? "corner" : true}
+diff --git a/src/components/SidebarFooter.tsx b/src/components/SidebarFooter.tsx
+index 4f3fa720f..48ef2b9f2 100644
+--- a/src/components/SidebarFooter.tsx
++++ b/src/components/SidebarFooter.tsx
+@@ -59,7 +59,7 @@ export function SidebarFooter({ density, simple = false, owner = null, archived,
+   const { dispatch } = useStore();
+   if (simple) return <SimpleSidebarFooter owner={owner} archived={archived} />;
+   return (
+-    <div className={cn("pb-3 pt-2", density === "icons" ? "flex flex-col items-center gap-0 px-2" : "px-3")}>
++    <div className={cn(density === "icons" ? "flex flex-col items-center gap-0 px-2 pb-2 pt-1" : "px-3 pb-3 pt-2")}>
+       <SidebarFooterNav density={density} collapsed={toolsCollapsed} onToggleCollapsed={onToggleTools} />
+       {density === "icons" ? (
+         <>
+diff --git a/src/components/SidebarFooterNav.test.ts b/src/components/SidebarFooterNav.test.ts
+index 25946b423..8800cc4d7 100644
+--- a/src/components/SidebarFooterNav.test.ts
++++ b/src/components/SidebarFooterNav.test.ts
+@@ -305,7 +305,7 @@ describe("toolbar tools layout", () => {
+     fixture.advanced = true;
+     const rows = render("icons").html;
+     expect(render("icons", { toolsLayout: "toolbar" }).html).toBe(rows);
+-    expect(rows).toContain('class="flex flex-col items-center gap-0"');
++    expect(rows).toContain('class="flex flex-col items-center gap-1"');
+   });
+ 
+   it("rows layout renders exactly as before", () => {
+diff --git a/src/components/SidebarFooterNav.tsx b/src/components/SidebarFooterNav.tsx
+index 9953f0754..4a0db5772 100644
+--- a/src/components/SidebarFooterNav.tsx
++++ b/src/components/SidebarFooterNav.tsx
+@@ -47,7 +47,7 @@ function NavRow({
+       aria-current={active ? "page" : undefined}
+       className={cn(
+         "relative flex items-center rounded-xl transition-colors",
+-        rail ? "size-9 shrink-0 justify-center" : iconsOnly ? "mx-auto size-10 shrink-0 justify-center" : "w-full min-h-9 gap-3 px-3 py-1.5 text-left",
++        rail ? "size-9 shrink-0 justify-center" : iconsOnly ? "mx-auto size-8 shrink-0 justify-center" : "w-full min-h-9 gap-3 px-3 py-1.5 text-left",
+         active ? "bg-raised text-ink" : "text-ink hover:bg-raised/50",
+       )}
+     >
+@@ -199,7 +199,7 @@ export function SidebarFooterNav({
+   );
+ 
+   if (iconsOnly) {
+-    return <nav data-tour="tools" aria-label={t("sidebar.tools")} className="flex flex-col items-center gap-0">{rows}</nav>;
++    return <nav data-tour="tools" aria-label={t("sidebar.tools")} className="flex flex-col items-center gap-1">{rows}</nav>;
+   }
+   return (
+     <div data-tour="tools">
+diff --git a/src/components/chat-bubble.ts b/src/components/chat-bubble.ts
+index 69df60018..a2fcbe283 100644
+--- a/src/components/chat-bubble.ts
++++ b/src/components/chat-bubble.ts
+@@ -8,8 +8,8 @@ import type { Message } from "@/state/store";
+ import { isCancelledTranscriptRow } from "../../shared/client-cancel";
+ import { isPureLeakedSystemHarnessMessage } from "../../shared/system-message-guard.ts";
+ 
+-/** Simple mode's message text: 15/22, the size whose cap height matches the design. */
+-export const SIMPLE_BUBBLE_TEXT = "text-[15px] leading-[22px]";
++/** Simple mode's message text: 17/25 (15/22 hasta el 016, +2 px por legibilidad y jerarquia). */
++export const SIMPLE_BUBBLE_TEXT = "text-[17px] leading-[25px]";
+ 
+ const SIMPLE_BUBBLE_SHAPE = `min-w-9 rounded-[18px] px-3 py-[7px] ${SIMPLE_BUBBLE_TEXT}`;
+ 
+@@ -26,7 +26,7 @@ export const SIMPLE_BUBBLE_MAX = "max-w-[min(var(--chat-bubble-max),var(--chat-b
+ export function plainBotBubble(simple: boolean): string {
+   return simple
+     ? cn("chat-text w-fit whitespace-pre-wrap", SIMPLE_BUBBLE_MAX, SIMPLE_BOT_BUBBLE)
+-    : "chat-text w-fit max-w-[min(var(--chat-bubble-max),var(--chat-bubble-pct))] rounded-2xl bg-card px-4 py-2.5 text-[15px] leading-relaxed whitespace-pre-wrap text-ink";
++    : "chat-text w-fit max-w-[min(var(--chat-bubble-max),var(--chat-bubble-pct))] rounded-2xl bg-card px-4 py-2.5 text-[17px] leading-relaxed whitespace-pre-wrap text-ink";
+ }
+ 
+ /** Simple mode's transcript spaces rows 16px apart (ChatView's data-simple-rows); a row in the same group pulls up 12px, to 4px. */
+diff --git a/src/styles.css b/src/styles.css
+index 2a033b227..9c5e4b891 100644
+--- a/src/styles.css
++++ b/src/styles.css
+@@ -1290,7 +1290,7 @@
+ }
+ [data-chat-bubble="simple"] :is(.chat-md, .chat-text),
+ [data-chat-bubble="simple"].chat-text {
+-  line-height: 22px;
++  line-height: 25px;
+ }
+ [data-chat-bubble="simple"] .chat-md > * + * {
+   margin-top: 10px;
