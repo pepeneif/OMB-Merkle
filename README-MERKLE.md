@@ -1,9 +1,12 @@
-# OMB-140-Merkle
+# OMB-Propio-Merkle
 
-Fork de trabajo de **OpenMausBot v0.1.140** (Merkle.Space) — bitácora de modificaciones
-que aplicamos sobre el original. Base: tag upstream `v0.1.140` (commit `4b74b80`).
+Fork de trabajo propio de **Merkle.Space** sobre **OpenMausBot**. Vamos en la **v0.1.165**
+de OpenMausBot. Este archivo es la bitacora de las modificaciones que aplicamos sobre el
+original. Las secciones historicas de la 140 y la 143 se conservan abajo tal cual.
 
-Rama base: **`base-v0.1.140`** = v0.1.140 original sin parches.
+Ramas de trabajo:
+- **`merkle/v165-port`** = estado vigente (v0.1.165 + nuestros parches; desplegado en alfa).
+- `merkle/v154-port`, `merkle/v153-port`, `merkle/port-v143`, `base-v0.1.140` = etapas anteriores.
 
 ## Lista v140/A/B/C/D
 
@@ -11,13 +14,13 @@ Rama base: **`base-v0.1.140`** = v0.1.140 original sin parches.
 | Código | Qué es | Origen (en la 130) | Estado |
 |---|---|---|---|
 | v140-A1 | Reponer `openssh-client` + `docker.io` en la imagen runtime (el escritorio del VPS se maneja por Docker-over-SSH) | 0011 | APLICADO (001) + desplegado en alfa |
-| v140-A2 | Ningún bot muestra su rol junto al nombre | A2 (0021) | PENDIENTE |
-| v140-A3 | Formato markdown en los mensajes del USUARIO | A3 (0020) | PENDIENTE |
-| v140-A4 | Narración interna: fondo transparente, 2 px menor, padding vertical a la mitad | A4 (0017/0030) | PENDIENTE |
-| v140-A5 | Burbujas del usuario con texto largo sin recorte | A5 (0022) | PENDIENTE |
-| v140-A6 | Tema Atelier: burbuja del usuario blanca, igual que la del bot | A6 (0023) | PENDIENTE |
-| v140-A7 | Cuadro "This run" conserva el colapso (llave global, sobrevive recargas) | A7 (0032) | PENDIENTE |
-| v140-A8 | Búsqueda dentro de las tablas siempre | A8 (0020) | PENDIENTE |
+| v140-A2 | Ningún bot muestra su rol junto al nombre | A2 (0021) | APLICADO (en la 153, sigue en la 165) |
+| v140-A3 | Formato markdown en los mensajes del USUARIO | A3 (0020) | APLICADO (en la 153, sigue en la 165) |
+| v140-A4 | Narración interna: fondo transparente, 2 px menor, padding vertical a la mitad | A4 (0017/0030) | APLICADO (en la 153, sigue en la 165) |
+| v140-A5 | Burbujas del usuario con texto largo sin recorte | A5 (0022) | APLICADO (en la 153, sigue en la 165) |
+| v140-A6 | Tema Atelier: burbuja del usuario blanca, igual que la del bot | A6 (0023) | APLICADO (en la 153, sigue en la 165) |
+| v140-A7 | Cuadro "This run" conserva el colapso (llave global, sobrevive recargas) | A7 (0032) | APLICADO (en la 153, sigue en la 165) |
+| v140-A8 | Búsqueda dentro de las tablas siempre | A8 (0020) | APLICADO (en la 153, sigue en la 165) |
 | v140-A9 | Bloque de superficie (prompt del harness) compacto | A15 (0037) | APLICADO (ef840d27f) + desplegado en alfa |
 
 ### B — Pendientes técnicos
@@ -189,7 +192,7 @@ chocan porque la UI de la 140 cambió. Se rehacen sobre la 140.
 
 ---
 
-# Port a la v0.1.143 (rama `merkle/port-v143`)
+# Port a la v0.1.143 (rama `merkle/port-v143`) — historico
 
 Rama **100% aparte** de la 140 (alfa sigue con la 140 intacta). Base: tag limpio
 `v0.1.143` (`c8e40ffbb`). Estrategia: **una sola fusion a 3 vias** del estado parcheado
@@ -243,3 +246,72 @@ y anadido `Composer.tsx` (1041), como ya hizo el fork de la 140 (rama privada).
 ## Estado
 
 Sin desplegar. Alfa sigue con la 140. Se despliega a alfa solo si Jose lo aprueba.
+
+---
+
+# Port a la v0.1.165 (rama `merkle/v165-port`) — estado vigente
+
+Estado actual del fork: **OpenMausBot v0.1.165 + nuestros parches**, desplegado en alfa
+(`alfa.merkle.space`). Se parte de `merkle/v154-port` (no de la 153), asi que el salto es de
+una version: fusion de la etiqueta `v0.1.165` (commit `0bf450c39`) sobre la 154 parcheada.
+Merge resuelto en el commit `1768cc812`.
+
+Commits de la rama:
+- `1768cc812` — port a v0.1.165: merge resuelto sobre `merkle/v154-port`.
+- `6cd0c1e23` — parches que el merge no arrastro: compositor de la 153 (orden de iconos y
+  emoji), asa tactil, nocturno del CI apagado, 013 portado (aislamiento de computadoras por
+  instalacion + pastillas de cabecera).
+- `ad04cbe82` — 012 y 013 sincronizados con la 153.
+
+## Los 7 archivos con conflicto (resueltos)
+
+`Dockerfile`, `scripts/testing/file-size-ratchet.test.ts`, `src/components/ChatView.tsx`,
+`src/components/GroupView.tsx`, `src/components/Sidebar.tsx`, `src/main.tsx` y
+`src/state/store.tsx`. Regla: se conserva lo nuestro y se adopta lo nuevo de la 165 encima.
+
+## Lo que conservamos
+
+Cabecera 0010 sin pildora, selector de hilo con el titulo del hilo actual, compositor con
+selector de emojis, markdown en los mensajes del usuario, borde del color del bot en
+`GroupView`, rail de 72 px. Ratchet subido a `ChatView` 1351, `Sidebar` 1694, `GroupView` 1229,
+`ModelPicker` 1048 y `Composer` 1059 (este ultimo porque nuestro compositor lo paso de 1,000).
+
+## Parches que el merge no arrastro y se re-aplicaron
+
+| Parche | Que hacia | Como quedo |
+|---|---|---|
+| 013 | Acomodo del compositor (libro/birrete/emoji/clip), `absoluteStrokeWidth` del emoji, pastillas de cabecera con `bg-raised/60` y **aislamiento de computadoras por instalacion** | Aplicado |
+| Nocturno del CI | `schedule: cron "17 21 * * *"` apagado el 2026-11-15 | Se habia reactivado; apagado otra vez (comentado en `.github/workflows/ci.yml`) |
+| Asa de arrastre | `touch:opacity-100` para que se vea en pantalla tactil | Aplicado |
+| 0008 | `MESSAGE_PAGE_SIZE` de 200 a 50 | Vive ahora en `src/state/message-history.ts`; valor 50 |
+| 0037 | Bloque de superficie del harness compacto | Rehecho a mano sobre el `server/surface.ts` nuevo (ahorro de 98 bytes por turno, no 478: la 165 ya habia recortado) |
+| Skill de Netlify | `publish-to-netlify` apagado (`defaultEnabled: false`) y fuera del rail, barra del telefono y menu de perfil | Aplicado |
+
+El aislamiento del 013 era el importante porque los datos se clonaron de produccion: el hash
+del nombre de cada VM incluye ahora el `environment-id`. Alfa resuelve `…-52d1bced558b` y
+produccion `…-83dd946e8eb8`; antes ambas caian en `…-56f06f9de0ac`.
+
+## Verificacion
+
+`tsc` limpio en cliente y servidor. 106 pruebas dirigidas en verde (compositor, emoji, sidebar
+y selector de modelo). Bundle reconstruido y servido.
+
+## Despliegue en alfa (2026-11-17 03:25 UTC)
+
+- Contenedor `omb-165-omb-1`, proyecto compose `/home/pepeneif/deploy-165`, red host,
+  puertos **9899** (app) y **9900** (webhooks). Imagen `openmausbot:v0.1.165-r4`
+  (ID `4f951c79aecd`, 2.15 GB); `r1`–`r3` quedan para revertir.
+- Volumen propio `omb_165_data`: copia en caliente del `omb_143_data` + delta tras parar la
+  149 (`stop -t 60`, exit 0, lease liberado). `messages.db` con md5 identico al de la 153.
+- Vhost de Caddy sin cambios (sigue apuntando a 9899).
+- Reversion: `omb_143_data` intacto (17 GB) y `omb-149-omb-1` parado, no borrado; compose y
+  `.env` de la 153 en `/home/pepeneif/bak-alfa-v153-20261117/`. Volver =
+  `cd /home/pepeneif/deploy-165 && docker compose down` y luego
+  `cd /home/pepeneif/deploy-149 && docker compose up -d`.
+- Produccion (`omb-prod-omb-1`, 8899) no se toco.
+
+## Pendiente
+
+- `merkle/v154-port` tambien quedo con este README desactualizado (encabezado de la 140); no
+  afecta ejecucion.
+- Este archivo no se ha commiteado en la rama `merkle/v165-port`.
