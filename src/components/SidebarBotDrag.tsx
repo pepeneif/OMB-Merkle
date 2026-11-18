@@ -13,7 +13,8 @@ export const NEW_DEPARTMENT = "\u0000new";
 type DropHandlers = { onDragOver: (event: DragEvent<HTMLElement>) => void; onDrop: (event: DragEvent<HTMLElement>) => void };
 
 export type BotRowDrag = {
-  row(botId: string): DropHandlers & { draggable: true; onDragStart: (event: DragEvent<HTMLElement>) => void; onDragEnd: () => void };
+  row(botId: string): DropHandlers;
+  handle(botId: string): { draggable: true; onDragStart: (event: DragEvent<HTMLElement>) => void; onDragEnd: () => void };
   step(botId: string, direction: -1 | 1): void;
 };
 
@@ -96,22 +97,11 @@ export function useSidebarBotDrag({ dispatch, announce, onNamed, onRenamed, onEr
   };
   const rowDrop = (event: DragEvent<HTMLElement>, botId: string): BotDrop => {
     const box = event.currentTarget.getBoundingClientRect();
-    const canGroup = !latest.current.withinList && botListOf(latest.current.lists, botId) === "";
-    return { kind: "row", botId, place: botDropPlace(event.clientY - box.top, box.height, canGroup) };
+    return { kind: "row", botId, place: botDropPlace(event.clientY - box.top, box.height) };
   };
 
   controller.current ??= {
     row: (botId) => ({
-      draggable: true,
-      onDragStart: (event) => {
-        if (!latest.current.enabled || botListOf(latest.current.lists, botId) === undefined) return;
-        event.stopPropagation();
-        event.dataTransfer.effectAllowed = "move";
-        event.dataTransfer.setData(BOT_ROW_DRAG_TYPE, botId);
-        moving.current = { botId, drop: null };
-        setDragging(botId);
-      },
-      onDragEnd: end,
       onDragOver: (event) => {
         if (!carries(event) || !moving.current.botId) return;
         // Within one list only (the collapsed rail): another list's row shows no drop line, since the drop is refused.
@@ -127,6 +117,18 @@ export function useSidebarBotDrag({ dispatch, announce, onNamed, onRenamed, onEr
         event.stopPropagation();
         finish(botId === moving.current.botId ? null : rowDrop(event, botId));
       },
+    }),
+    handle: (botId) => ({
+      draggable: true,
+      onDragStart: (event) => {
+        if (!latest.current.enabled || botListOf(latest.current.lists, botId) === undefined) return;
+        event.stopPropagation();
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData(BOT_ROW_DRAG_TYPE, botId);
+        moving.current = { botId, drop: null };
+        setDragging(botId);
+      },
+      onDragEnd: end,
     }),
     step: (botId, direction) => {
       const move = latest.current.enabled ? stepBot(latest.current.lists, botId, direction) : null;

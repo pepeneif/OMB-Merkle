@@ -13,14 +13,10 @@ export function SidebarBotRole({ role }: { role: string }) {
 }
 
 export function ChatHeadRole({ bot }: { bot: Pick<Bot, "title" | "chiefOfStaff"> }) {
-  const role = bot.title.trim();
-  const repeatsChiefBadge = bot.chiefOfStaff && role.toLocaleLowerCase() === t("chat.chiefOfStaff").toLocaleLowerCase();
-  if (!role || repeatsChiefBadge) return null;
-  return (
-    <span data-chathead-role className="flex min-w-0 max-w-fit grow basis-0">
-      <span title={role} className="max-w-[16rem] truncate text-[13px] text-ink-secondary">{role}</span>
-    </span>
-  );
+  // 0024 (A2, v140): NO se muestra el rol de ningun bot en la cabecera del chat, ni del
+  // Chief of Staff. Jose lo pidio asi el 2026-10-31 y lo confirmo para la 140 el 2026-11-04.
+  void bot;
+  return null;
 }
 
 export function chiefOfStaffBadge(bot: Bot) {

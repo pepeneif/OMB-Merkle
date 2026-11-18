@@ -62,7 +62,7 @@ export function UpdateIndicator({ className, bar }: { className?: string; bar?: 
   );
   return (
     <div
-      className={cn("flex size-[46px] shrink-0 items-center justify-center", className)}
+      className={cn("flex size-10 shrink-0 items-center justify-center", className)}
     >
       <button
         ref={buttonRef}

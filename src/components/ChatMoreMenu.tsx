@@ -4,6 +4,7 @@ import { currentTaskBot, openBotThread, useStore, visibleMessages, type Bot } fr
 import { useAdvancedMode } from "@/lib/interface-mode";
 import { useShowThreads } from "@/lib/thread-preferences";
 import { requestChatFind, useChatFindOpen } from "@/lib/chat-find";
+import { requestModelPicker } from "@/lib/model-picker-open";
 import { usageSummary } from "@/lib/chat-usage-summary";
 import {
   copyTranscriptToClipboard,
@@ -56,8 +57,12 @@ export function useChatMoreItems(profile: Bot, phoneHeader = false): { items: Si
       onSelect: () => openConversationDialog({ kind: "person", botId: profile.id, threadId: bot.threadId }) }] : []),
   ].map((item, index) => (index === 0 ? { ...item, separatorBefore: true } : item));
   const selection = profile.modelSelection;
-  const modelName = phoneHeader && selection
-    ? state.instances.find((candidate) => candidate.instanceId === selection.instanceId)?.models.options.find((option) => option.id === selection.model)?.label ?? selection.model
+  // A18 (v140): el menu muestra el modelo y la intensidad; en movil ya lo hacia, ahora tambien en escritorio.
+  // A20 (v140): al elegir el modelo o la intensidad se abre el selector de modelos del chat (igual que la 130), no
+  // los ajustes; si no hay selector montado para este hilo, cae a los ajustes.
+  const openModelPicker = () => { if (!requestModelPicker(bot.threadId)) openBotSettings(dispatch, "model"); };
+  const modelName = selection
+    ? state.instances.find((candidate) => candidate.instanceId === selection.instanceId)?.models?.options?.find((option) => option.id === selection.model)?.label ?? selection.model
     : "";
   // On a phone the header drops the profile pill's click target, the model chip and the Bot's screen button; they live here.
   const phoneItems: SidebarMenuItem[] = phoneHeader ? [
@@ -75,7 +80,7 @@ export function useChatMoreItems(profile: Bot, phoneHeader = false): { items: Si
       icon: <Cpu size={16} />,
       value: modelName,
       trailing: <UsageBars engine={selection?.instanceId} hover={false} />,
-      onSelect: () => openBotSettings(dispatch, "model"),
+      onSelect: openModelPicker,
     } satisfies SidebarMenuItem]),
     {
       key: "computer",
@@ -95,6 +100,20 @@ export function useChatMoreItems(profile: Bot, phoneHeader = false): { items: Si
       trailing: <ShortcutHint id="find-conversation" />,
       onSelect: () => requestChatFind(bot.threadId),
     },
+    // A18 (v140): el escritorio muestra modelo e intensidad aqui; en movil ya vienen en phoneScreen.
+    ...(phoneHeader ? [] : [{
+      key: "model",
+      label: t("model.simple.model"),
+      icon: <Cpu size={16} />,
+      value: modelName,
+      onSelect: openModelPicker,
+    } satisfies SidebarMenuItem, {
+      key: "reasoning",
+      label: t("model.effort.label"),
+      icon: <Gauge size={16} />,
+      value: selection?.effort ?? "",
+      onSelect: openModelPicker,
+    } satisfies SidebarMenuItem]),
     ...phoneScreen,
     ...(showThreads || side === "team" ? [] : [{
       key: "new-thread",
@@ -268,7 +287,7 @@ export function ChatHeaderMenu({ bot }: { bot: Bot }): JSX.Element {
         <span
           data-testid="chat-more"
           className={cn(
-            "flex size-8 items-center justify-center rounded-full transition-colors hover:bg-ink/[0.06]",
+            "flex size-8 items-center justify-center rounded-md transition-colors hover:bg-raised",
             open || on ? "text-accent" : "text-ink-secondary hover:text-ink",
           )}
           title={t("chat.more")}

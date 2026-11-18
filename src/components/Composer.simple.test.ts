@@ -349,6 +349,9 @@ describe("the Advanced composer", () => {
     expect(fixture.groupCall).toBeNull();
   });
 
+  // Portado de la 130 (0035/0036): la caja arranca en dos renglones y crece hacia abajo sin
+  // sacar el texto de la fila ni subirlo encima de los iconos; el editor queda siempre junto
+  // a los botones, sea un renglon o cinco.
   describe("with a message longer than one line", () => {
     const type = (value: string) => {
       const field = container.querySelector("textarea")!;
@@ -358,64 +361,21 @@ describe("the Advanced composer", () => {
       });
     };
     const classes = (selector: string) => container.querySelector(selector)!.className.split(" ");
-    const stacked = () => classes(".mention-editor").includes("basis-full");
-    /** A field 20 characters wide: longer text wraps onto a second 24px line. */
-    const wrapPast20 = () => vi.spyOn(HTMLTextAreaElement.prototype, "scrollHeight", "get")
-      .mockImplementation(function (this: HTMLTextAreaElement) { return this.value.length > 20 ? 48 : 24; });
 
-    it("gives the text the full width above the buttons, and puts it back beside them on one line", () => {
+    it("keeps the editor beside the buttons, never taking the full width above them", () => {
       fixture.advanced = true;
       render({ bot });
-      expect(stacked()).toBe(false);
       type("Okay I have done my outreach.\nAnother line of text.");
-      expect(classes(".mention-editor")).toEqual(expect.arrayContaining(["order-first", "basis-full"]));
-      expect(classes("[data-composer-row]")).toContain("flex-wrap");
-      expect(classes("[data-composer-actions]")).toContain("ml-auto");
-      type("Okay I have done my outreach.");
-      expect(stacked()).toBe(false);
+      expect(classes(".mention-editor")).not.toContain("basis-full");
+      expect(classes(".mention-editor")).not.toContain("order-first");
       expect(classes("[data-composer-row]")).not.toContain("flex-wrap");
-    });
-
-    it("stacks once the text wraps beside the buttons, and stays stacked until it is shorter than where it wrapped", () => {
-      wrapPast20();
-      fixture.advanced = true;
-      render({ bot });
-      type("a".repeat(25));
-      expect(stacked()).toBe(true);
-      // Wider on its own line, it would fit on one row there; it still must not flip back and forth.
-      type("a".repeat(30));
-      expect(stacked()).toBe(true);
-      type("a".repeat(24));
-      expect(stacked()).toBe(true);
-      type("a".repeat(10));
-      expect(stacked()).toBe(false);
-    });
-
-    it("measures each new message afresh, so a wrap from a narrower composer does not stick", () => {
-      const wrap = wrapPast20();
-      fixture.advanced = true;
-      render({ bot });
-      type("a".repeat(25));
-      expect(stacked()).toBe(true);
-      type("");
-      // Wider now: 30 characters fit on the one row.
-      wrap.mockImplementation(function (this: HTMLTextAreaElement) { return this.value.length > 40 ? 48 : 24; });
-      type("a".repeat(30));
-      expect(stacked()).toBe(false);
-    });
-
-    it("never stacks an empty field, even when its placeholder wraps", () => {
-      vi.spyOn(HTMLTextAreaElement.prototype, "scrollHeight", "get").mockReturnValue(48);
-      fixture.advanced = true;
-      render({ bot });
-      expect(stacked()).toBe(false);
+      expect(classes("[data-composer-actions]")).not.toContain("ml-auto");
     });
 
     it("leaves Simple's pill alone", () => {
-      wrapPast20();
       render({ bot });
       type("a".repeat(25) + "\nb");
-      expect(stacked()).toBe(false);
+      expect(classes(".mention-editor")).not.toContain("basis-full");
       expect(classes("[data-composer-row]")).not.toContain("flex-wrap");
     });
   });

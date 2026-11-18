@@ -17,10 +17,9 @@ export type BotMove =
   /** The first bot stays where the second was dropped on it; both start a department. */
   | { kind: "group"; botIds: [string, string] };
 
-/** The middle half of a row starts a department with it, where `canGroup`; the rest places the bot above or below. */
-export function botDropPlace(offset: number, height: number, canGroup: boolean): BotDropPlace {
+/** Above or below the row under the pointer, by which half it is in. A drag only reorders; a bot's menu starts a department. */
+export function botDropPlace(offset: number, height: number): BotDropPlace {
   const fraction = height > 0 ? offset / height : 0.5;
-  if (canGroup && fraction > 0.25 && fraction < 0.75) return "group";
   return fraction < 0.5 ? "before" : "after";
 }
 

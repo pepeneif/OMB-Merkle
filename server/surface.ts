@@ -198,7 +198,7 @@ const ASK_TO_SWITCH = `explain the mismatch and ask the user to change where thi
 const REPORT_BACK = "tell the bot that gave you this job which place you need and end your turn, because no person watches this conversation";
 
 const SURFACE_AUTHORITY =
-  ` For browser and computer tasks, use OpenMausBot's mounted browser/computer tools first: inspect the target, perform the action, and verify its result before claiming success. Discover deferred tools by their server/name when needed. Do not substitute the provider's own desktop, a shell-launched browser, or another automation path for the selected OpenMausBot surface. Ordinary code and file tasks may still use their normal tools. Announcing an action is not performing it. A request naming another place does not move these tools: this computer is the user's host, Local VM is an isolated desktop, the cloud computer is remote, and the built-in browser is a separate browser. If the requested place differs from the mounted one, ${ASK_TO_SWITCH}; never act on a different computer or describe a host window as a VM.`;
+  ` For browser and computer tasks, use OpenMausBot's mounted browser/computer tools first: inspect the target, perform the action, and verify its result before claiming success. Do not substitute the provider's own desktop, a shell-launched browser, or another automation path for the selected OpenMausBot surface. Announcing an action is not performing it. A request naming another place does not move these tools: this computer is the user's host, Local VM is an isolated desktop, the cloud computer is remote, and the built-in browser is a separate browser. If the requested place differs from the mounted one, ${ASK_TO_SWITCH}; never act on a different computer or describe a host window as a VM.`;
 
 /** The one control that moves a bot onto this computer, in the app's own words (en.json chat.botScreen,
  * computer.simple.whereWorks, vm.dest.local). A bot left to guess sent the person to a "Settings → Computers" screen it made up. */
@@ -329,7 +329,7 @@ export function surfacePrompt(
   if (opts.canSelect) text += opts.selectionRules === false ? SELECTION_HERE : SELECTION_RULES;
   if (opts.canSelect && !computer && !mounted.browser) text += " No computer or browser tools are mounted yet; select_computer is the way to connect them before screen work, not a reason to claim you already performed it.";
   if (computer || mounted.browser) text += CONNECTED_APP_FIRST;
-  if (computer || mounted.browser) text += " For online research, use the selected OpenMausBot browser when a search service is unavailable. A failed tool proves only that this attempt failed, not that every browser is unavailable. Inspect the current page after navigation; report a sign-in page, redirect or error as such. A completed model turn is not proof that the user's task succeeded.";
+  if (computer || mounted.browser) text += " For online research, use the selected OpenMausBot browser when a search service is unavailable. A failed tool proves only that this attempt failed, not that every browser is unavailable. Inspect the current page after navigation; report a sign-in page, redirect or error as such. ";
   if (opts.cloudHome) for (const [desktop, cloudHome] of CLOUD_HOME_WORDING) text = text.replace(desktop, cloudHome);
   if (opts.cloudHome && opts.ownComputer) {
     // What this turn's places reach, never every screen: their own computer is reachable too, through shared_computer.

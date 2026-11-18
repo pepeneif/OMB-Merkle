@@ -56,20 +56,20 @@ afterEach(() => {
 describe("sidebar header", () => {
   const collapse = /aria-label="(Collapse sidebar to avatars|Expand sidebar)"|data-sidebar-edge-toggle/;
 
-  it.each(["comfortable", "icons"] as const)("keeps the Inbox and add, and no button collapses or expands it, at %s density in Advanced mode", (density) => {
+  it.each(["comfortable", "icons"] as const)("keeps Active Threads and add, and no button collapses or expands it, at %s density in Advanced mode", (density) => {
     fixture.density = density;
     const html = render();
-    expect(html).toContain('aria-label="Inbox"');
-    expect(html).not.toContain('aria-label="Active Threads"');
+    expect(html).not.toContain('aria-label="Inbox"');
+    expect(html).toContain('aria-label="Active Threads"');
     expect(html).toContain('aria-label="New or share"');
     expect(html).not.toMatch(collapse);
   });
 
-  it.each(["comfortable", "icons"] as const)("keeps the Inbox and add, no activity menu and no collapse button in Simple mode at %s density: its edge is dragged instead", (density) => {
+  it.each(["comfortable", "icons"] as const)("keeps no activity menu and no collapse button in Simple mode at %s density: its edge is dragged instead", (density) => {
     fixture.advanced = false;
     fixture.density = density;
     const html = render();
-    expect(html).toContain('aria-label="Inbox"');
+    expect(html).not.toContain('aria-label="Inbox"');
     expect(html).not.toContain('aria-label="Active Threads"');
     expect(html).toContain('aria-label="New or share"');
     expect(html).not.toMatch(collapse);
@@ -115,7 +115,7 @@ describe("sidebar top row", () => {
     expect(spacer).toBeGreaterThan(slot);
     expect(switcher).toBeGreaterThan(spacer);
     expect(buttons).toBeGreaterThan(switcher);
-    expect(row.slice(buttons).match(/<button/g)).toHaveLength(1);
+    expect(row.slice(buttons).match(/<button/g)).toHaveLength(2);
     const rowClasses = classesOf(row, "data-sidebar-top-row");
     expect(rowClasses).toEqual(expect.arrayContaining(["relative", "pl-4", "pr-2"]));
     expect(rowClasses).not.toContain("px-4");
@@ -221,7 +221,7 @@ describe("sidebar top row", () => {
     expect(top).not.toContain("data-sidebar-top-buttons");
     expect(top).not.toContain("data-workspace-switcher");
     expect(top.indexOf('aria-label="Search bots and messages"')).toBeLessThan(top.indexOf('aria-label="New or share"'));
-    expect(top).toMatch(/data-sidebar-rail-top="true" class="flex flex-col items-center gap-2 pt-1"/);
+    expect(top).toMatch(/data-sidebar-rail-top="true" class="flex flex-col items-center gap-\[7px\] pt-1"/);
     expect(top).toMatch(/aria-label="New or share" class="[^"]*\bsize-9\b[^"]*\brounded-full\b/);
     const foot = html.slice(html.indexOf("data-sidebar-rail-footer"));
     const at = (marker: string) => {
@@ -252,9 +252,9 @@ describe("sidebar top row", () => {
     const row = topRow(html);
     expect(row).not.toContain("data-workspace-switcher");
     expect(row).not.toContain("data-sidebar-top-spacer");
-    expect(classesOf(row, "data-sidebar-top-row")).toEqual(["flex", "items-center", "flex-col", "gap-1", "px-2", "pt-3.5", "pb-1"]);
+    expect(classesOf(row, "data-sidebar-top-row")).toEqual(["flex", "items-center", "flex-col", "gap-[2px]", "px-2", "pt-[11px]", "pb-1"]);
     expect(row).not.toContain("data-traffic-light-space");
-    expect(classesOf(row, "data-sidebar-top-buttons")).toEqual(["relative", "flex", "shrink-0", "items-center", "flex-col", "gap-1"]);
+    expect(classesOf(row, "data-sidebar-top-buttons")).toEqual(["relative", "flex", "shrink-0", "items-center", "flex-col", "gap-[2px]"]);
     expect(html.match(/Switch server:/g)).toHaveLength(1);
   });
 });
@@ -305,7 +305,7 @@ describe("the button that hides and shows the window's rail of places", () => {
     const column = render();
     expect(column.indexOf("data-rail-toggle")).toBeGreaterThan(-1);
     expect(column.indexOf("data-rail-toggle")).toBeLessThan(column.indexOf("data-sidebar-top-buttons"));
-    expect(toggle(column)).toMatch(/class="[^"]*\bsize-\[46px\][^"]*\brounded-xl\b/);
+    expect(toggle(column)).toMatch(/class="[^"]*\bsize-8\b[^"]*\brounded-md\b/);
     fixture.advanced = false;
     const rail = render();
     expect(rail.indexOf("data-rail-toggle")).toBeLessThan(rail.indexOf("data-sidebar-rail-top"));
@@ -334,7 +334,7 @@ describe("sidebar head and foot", () => {
       const head = at('data-glass-bar="top"');
       const topRow = at("data-sidebar-top-row");
       const search = at('aria-label="Search bots and messages"');
-      const list = at('data-scroll-fade-frame=""');
+      const list = at("glass-scroller-content");
       const foot = at('data-glass-bar="bottom"');
       const automations = at('data-sidebar-nav="automations"');
       const places = at('data-sidebar-nav="team-map"');

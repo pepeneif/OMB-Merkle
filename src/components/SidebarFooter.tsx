@@ -59,12 +59,12 @@ export function SidebarFooter({ density, simple = false, owner = null, archived,
   const { dispatch } = useStore();
   if (simple) return <SimpleSidebarFooter owner={owner} archived={archived} />;
   return (
-    <div className={cn("pb-3 pt-2", density === "icons" ? "flex flex-col items-center gap-1 px-2" : "px-3")}>
+    <div className={cn(density === "icons" ? "flex flex-col items-center gap-0 px-2 pb-2 pt-1" : "px-3 pb-3 pt-2")}>
       <SidebarFooterNav density={density} collapsed={toolsCollapsed} onToggleCollapsed={onToggleTools} />
       {density === "icons" ? (
         <>
           <SidebarPhoneButton density={density} onOpen={() => dispatch(phoneSettingsAction())} />
-          <div className="flex flex-col items-center justify-center gap-1">
+          <div className="flex flex-col items-center justify-center gap-[2px]">
             <UpdateIndicator />
             <SidebarProfileMenu iconOnly />
           </div>

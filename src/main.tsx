@@ -8,6 +8,7 @@ import { t } from "./lib/i18n";
 import { loadPageLanguage } from "./lib/language-preference";
 import { applySkinChoice, readSkinChoice } from "./lib/skins";
 import { applyChatWidth, readChatWidth } from "./lib/chat-width";
+import { applyStoredBubbleWidths } from "./lib/bubble-width";
 import { applyFont, readFont } from "./lib/fonts";
 import { applySoftwareRendering } from "./lib/software-rendering";
 import { loadTheme, startTheme } from "./lib/theme/runtime";
@@ -26,6 +27,7 @@ applySkinChoice(readSkinChoice());
 applyFont(readFont());
 applySoftwareRendering();
 applyChatWidth(readChatWidth());
+applyStoredBubbleWidths();
 startTheme();
 const pageLanguage = loadPageLanguage();
 

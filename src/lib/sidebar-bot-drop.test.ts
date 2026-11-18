@@ -9,9 +9,9 @@ const lists: BotLists = new Map([
 ]);
 
 describe("where a dragged bot lands", () => {
-  it("starts a department from the middle half of a row that is in none, and places it above or below otherwise", () => {
-    expect([0, 13, 14, 27, 40, 41, 54].map((offset) => botDropPlace(offset, 54, true))).toEqual(["before", "before", "group", "group", "group", "after", "after"]);
-    expect([0, 26, 27, 54].map((offset) => botDropPlace(offset, 54, false))).toEqual(["before", "before", "after", "after"]);
+  it("places the bot above or below the row under the pointer, by which half it is in", () => {
+    expect([0, 13, 26, 27, 40, 54].map((offset) => botDropPlace(offset, 54))).toEqual(["before", "before", "before", "after", "after", "after"]);
+    expect(botDropPlace(27, 0)).toBe("after");
   });
 
   it("reorders within the list, in either direction, and a drop that changes nothing does nothing", () => {

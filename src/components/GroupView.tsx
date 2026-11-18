@@ -31,8 +31,11 @@ import { normalizeState } from "@/lib/mascot";
 import { botTextShowsSpeaker, laterTextOwns, runShowsSpeaker } from "@/lib/room-speaker"; import { roomAddressees } from "@/lib/room-addressees";
 import { defaultResponderName, groupResponseHint, jevRoomRoutingOn } from "@/lib/group-routing";
 import { ChatMarkdown } from "./ChatMarkdown";
+import { userTextHasMarkdown } from "@/lib/remark-user-format";
 import { FailedTurnRow, MessageBoundary } from "./ChatView";
-import { SIMPLE_BOT_BUBBLE, SIMPLE_BUBBLE_MAX, SIMPLE_BUBBLE_TEXT, SIMPLE_USER_BUBBLE } from "./chat-bubble";
+import { SIMPLE_BOT_BUBBLE, SIMPLE_BUBBLE_MAX, SIMPLE_BUBBLE_TEXT, SIMPLE_USER_BUBBLE, TINT_BORDER_CLASS, USER_TINT_BORDER } from "./chat-bubble";
+import { useColorUserBubbles } from "@/lib/user-bubble-preference";
+import { MAUS_COLORS } from "@/lib/mascot";
 import { ReplyBlocks } from "./ReplyBlocks";
 import { useAdvancedMode } from "@/lib/interface-mode";
 import { CopyButton, MESSAGE_ROW, MessageActions, messageActionClass, ReplyAction } from "./MessageActions";
@@ -71,6 +74,7 @@ import { isQuestionCard, QuestionCard } from "./QuestionCard";
 import { ManageMembersPanel } from "./ManageMembersPanel";
 import { groupActivityRuns, isStatusActivity, roomTurnFolds } from "@/lib/activity-runs";
 import { TurnNarrationRun } from "./TurnNarrationRun";
+import { isNarrationText } from "@/lib/activity-runs";
 import { ActivityRun } from "./ActivityRun";
 import { cn } from "@/lib/cn";
 import { useMenuMotion } from "./MenuMotion";
@@ -131,9 +135,6 @@ export function RoomToolChip({ message, roomId, threadId, live = false }: { mess
   );
 }
 
-const USER_COLLAPSE_CHARS = 600;
-const USER_COLLAPSE_LINES = 8;
-
 function RoomTextMessage({
   group,
   message: m,
@@ -141,6 +142,7 @@ function RoomTextMessage({
   transcript,
   emerging,
   eager,
+  narration = false,
   onReply,
   canReact,
   phone,
@@ -151,6 +153,7 @@ function RoomTextMessage({
   transcript: Message[];
   emerging: boolean;
   eager: boolean;
+  narration?: boolean;
   onReply: (message: Message) => void;
   canReact: boolean;
   phone: boolean;
@@ -169,10 +172,15 @@ function RoomTextMessage({
   const speaking = speech.messageId === m.id && speech.status !== "idle";
   const focus = state.focusMessage;
   const focusedSearch = focus?.messageId === m.id && Boolean(focus.matchText) && focus.threadId === group.threadId;
-  const collapsible = user && !expanded && (display.length > USER_COLLAPSE_CHARS || display.split("\n").length > USER_COLLAPSE_LINES);
+  // 0022 (D5, v140-A5): las burbujas del usuario en salas tampoco se recortan (Jose, 2026-11-04).
+  const collapsible = false;
   useEffect(() => { if (focusedSearch && collapsible) setExpanded(true); }, [focusedSearch, collapsible, focus?.nonce]);
   const simple = !useAdvancedMode();
   const speakerBot = members.find((member) => member.id === m.from?.botId);
+  // A10 (v140): "Color my messages" marca la burbuja final de cada bot con un borde de 1 px de su color (salas).
+  const colorMine = useColorUserBubbles();
+  const tintedBot = Boolean(USER_TINT_BORDER && colorMine && !user && m.kind === "text" && !narration && !m.automation);
+  const tintBorderColor = tintedBot ? MAUS_COLORS[(speakerBot?.color ?? "green") as keyof typeof MAUS_COLORS] : undefined;
   const botText = rawText; const teammates = useTeammates(); const peers = useMemo(() => [...members, ...teammates.peers], [members, teammates]);
   const pin = roomPin(group, m, dispatch);
   const forkAction = !phone && !group.dm && m.kind === "text" && !m.id.startsWith("optimistic-")
@@ -215,16 +223,19 @@ function RoomTextMessage({
           data-chat-bubble={simple ? "simple" : ""} data-look={user ? "user-bubble" : "bot-bubble"}
           className={cn(
             tabled ? "w-full" : "w-fit",
-            simple ? cn(!tabled && SIMPLE_BUBBLE_MAX, SIMPLE_BUBBLE_TEXT) : "max-w-[min(var(--chat-bubble-max),var(--chat-bubble-pct))] rounded-2xl text-[15px] leading-relaxed",
+            simple ? cn(!tabled && SIMPLE_BUBBLE_MAX, SIMPLE_BUBBLE_TEXT) : "max-w-[min(var(--chat-bubble-max),var(--chat-bubble-pct))] rounded-2xl text-[17px] leading-relaxed",
             !user && emerging && !streamedReply(m.id) && "turn-answer",
             tabled || (!user && !m.text?.trim() && !m.replyToId && m.attachments?.length)
               ? "text-ink"
-              : !simple && !user && isFormattedReply(m.text ?? "")
+              : narration
+                ? "rounded-2xl px-4 py-[5px] text-[13px] text-ink"
+                : !simple && !user && isFormattedReply(m.text ?? "")
                 ? cn(formattedReplyWidth(m.text ?? ""), "px-1 text-ink")
                 : user
                   ? cn("chat-text whitespace-pre-wrap [overflow-wrap:anywhere] text-ink", simple ? SIMPLE_USER_BUBBLE : "bg-bubble-user px-4 py-2.5")
-                  : simple ? SIMPLE_BOT_BUBBLE : "bg-card px-4 py-2.5 text-ink",
+                  : cn(simple ? SIMPLE_BOT_BUBBLE : "bg-card px-4 py-2.5 text-ink", tintedBot && TINT_BORDER_CLASS),
           )}
+          style={tintedBot ? { borderColor: tintBorderColor } : undefined}
           title={new Date(m.at).toLocaleString(intlLocale())}
         >
           {m.replyToId && (() => {
@@ -252,7 +263,9 @@ function RoomTextMessage({
                 data-citation-owner={group.id}
                 data-citation-thread={group.threadId}
               >
-                <ThreadRefText text={display} peers={peers} everyone={!group.dm} />
+                {userTextHasMarkdown(display)
+                  ? <ChatMarkdown text={display} mentionPeers={peers} everyone={!group.dm} mentionPerson={{ profileName: state.config?.profile?.name }} underline message={{ threadId: group.threadId, messageId: m.id }} />
+                  : <ThreadRefText text={display} peers={peers} everyone={!group.dm} />}
               </div>{m.bugReport ? <BugReportNote report={m.bugReport} /> : m.pointed?.length ? <UserLineNote message={m} /> : null}
               {cited && <SentCitations
                 citations={cited.citations}
@@ -515,6 +528,7 @@ export const Transcript = memo(function Transcript({
                       transcript={transcript}
                       emerging={false}
                       eager={false}
+                      narration={isNarrationText(note)}
                       onReply={onReply}
                       canReact={canReact}
                       phone={phone}

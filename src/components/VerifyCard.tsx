@@ -4,6 +4,8 @@ import { useState } from "react";
 import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
 import { runSummary, type RunSkill, type RunStep } from "@/lib/verify-steps";
+import { runCardCollapsed, setRunCardCollapsed } from "@/lib/run-open-state";
+import { BubbleResizeHandle } from "./BubbleResizeHandle";
 
 function StatusIcon({ status }: { status: RunStep["status"] }) {
   const className = "size-4 shrink-0";
@@ -35,14 +37,24 @@ export function VerifyCard({
   onDismiss: () => void;
   onSave: () => void;
 }) {
+  // 0032 (A7): recuerda si el usuario colapso el cuadro. Es UNA SOLA preferencia GLOBAL
+  // (misma en todos los hilos) que sobrevive recargas; una vez colapsado se queda colapsado
+  // (aunque empiece otra tarea o lleguen actividades nuevas) y solo se reabre con su clic.
   const defaultCollapsed = steps.length > 6;
-  const [collapsed, setCollapsed] = useState(defaultCollapsed);
+  const [collapsed, setCollapsed] = useState(() => runCardCollapsed() ?? defaultCollapsed);
   if (steps.length === 0) return null;
+  const toggle = () => {
+    setCollapsed((current) => {
+      const next = !current;
+      setRunCardCollapsed(next);
+      return next;
+    });
+  };
   const toggleLabel = collapsed ? t("chat.verify.expand") : t("chat.verify.collapse");
   return (
     <section
       aria-label={t("chat.verify.aria")}
-      className="pointer-events-auto w-[22rem] max-w-full rounded-2xl border border-hairline/40 bg-raised/95 text-ink shadow-lg backdrop-blur-sm"
+      className="bbl bbl-run pointer-events-auto max-w-full rounded-2xl border border-hairline/40 bg-raised/95 text-ink shadow-lg backdrop-blur-sm"
     >
       <div className="flex items-center gap-2 px-3 py-2">
         <ListChecks size={14} className="shrink-0 text-accent" aria-hidden="true" />
@@ -54,7 +66,7 @@ export function VerifyCard({
         </div>
         <button
           type="button"
-          onClick={() => setCollapsed((current) => !current)}
+          onClick={toggle}
           aria-expanded={!collapsed}
           aria-label={toggleLabel}
           title={toggleLabel}
@@ -105,6 +117,7 @@ export function VerifyCard({
           )}
         </>
       )}
+      <BubbleResizeHandle kind="run" className="bbl-handle" />
     </section>
   );
 }

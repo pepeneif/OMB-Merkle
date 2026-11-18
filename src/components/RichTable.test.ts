@@ -25,11 +25,11 @@ describe("rich table rendering", () => {
     expect(html).not.toContain("<script>");
     expect(html).toContain('scope="col"');
   });
-  it("gives a short table its actions without the search box and row count a long one needs", () => {
+  it("gives a short table its actions and, with the search box always on (v140-A16), the row count a long one needs", () => {
     const table = (length: number) => renderToStaticMarkup(createElement(RichTable, { columns: [{ text: "ID" }], rows: Array.from({ length }, (_, i) => [{ text: String(i) }]) }));
     const short = table(8);
-    expect(short).not.toContain('aria-label="Search all rows…"');
-    expect(short).not.toContain("8 of 8 rows");
+    expect(short).toContain('aria-label="Search all rows…"');
+    expect(short).toContain("8 of 8 rows");
     expect(short).toContain('aria-label="Copy results as CSV"');
     const long = table(9);
     expect(long).toContain('aria-label="Search all rows…"');
@@ -114,7 +114,7 @@ describe("Simple mode's table card", () => {
     expect(html).toMatch(/<button type="button" class="group\/th [^"]*" aria-label="Sort by Sender"[^>]*><span dir="auto">Sender<\/span>/);
     expect(html).toContain("border-t-[0.5px] border-ink/[0.07]");
     expect(html).not.toContain("<footer");
-    expect(html).not.toContain(`aria-label="${"Search all rows…"}"`);
+    expect(html).toContain(`aria-label="${"Search all rows…"}"`);
     expect(html).toContain('data-fit="true"');
   });
 

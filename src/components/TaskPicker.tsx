@@ -1,13 +1,14 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { Activity, Check, ChevronDown, FolderInput, Pin, PinOff, Search, SquarePen, Trash2 } from "lucide-react";
+import { Activity, Check, ChevronDown, FolderInput, Pencil, Pin, PinOff, Plus, Search, Trash2 } from "lucide-react";
 import { useStore, type Bot, type BotProject, type Group, type Task } from "@/state/store";
 import { cn } from "@/lib/cn";
-import { MENU_ITEM_SEPARATOR, MENU_SHEET } from "./menu-recipe";
 import { roomThreadsWorkingElsewhere } from "@/lib/room-threads";
 import { useMenuMotion } from "./MenuMotion";
 import { t } from "@/lib/i18n";
 import { localizedTaskTitle } from "@/lib/task-title";
 import { COMPACT_BUBBLE } from "@/lib/compact-chip";
+import { ELEVATED_HEADER_FLOAT, ELEVATED_HEADER_HOVER } from "./elevated";
+
 import { formatTaskTokens, headlineTokens, usageDetail } from "@/lib/usage";
 import { nextRename } from "@/lib/rename";
 import { imeComposing } from "@/lib/send-key";
@@ -89,6 +90,7 @@ function ConversationTaskPicker({
   attention,
   onAttentionJump,
   workingElsewhere = 0,
+  variant = "default",
 }: {
   threadId: string;
   tasks: PickerTask[];
@@ -103,6 +105,8 @@ function ConversationTaskPicker({
   onPin?: (threadId: string, pinned: boolean) => void;
   attention?: AttentionThread[];
   onAttentionJump?: (entry: AttentionThread) => void;
+  /** A19b (v140): la pastilla de la cabecera, con el fondo de la pastilla del nombre. */
+  variant?: "default" | "header";
 }) {
   const [open, setOpen] = useState(false);
   const motion = useMenuMotion(open);
@@ -229,11 +233,13 @@ function ConversationTaskPicker({
         title={switchTitle}
         aria-label={t("task.switch")}
         className={cn(
-          "flex max-w-[220px] items-center gap-1.5 rounded-full border border-hairline/40 px-2.5 py-1 text-[13px] text-ink-secondary hover:bg-raised hover:text-ink",
-          COMPACT_BUBBLE,
+          variant === "header"
+            ? "flex h-9 max-w-[260px] items-center gap-1.5 rounded-full py-0.5 pl-3 pr-2.5 text-[14px] text-ink"
+            : "flex max-w-[220px] items-center gap-1.5 rounded-full border border-hairline/40 bg-raised/60 px-2.5 py-1 text-[13px] text-ink-secondary hover:bg-raised hover:text-ink",
+          variant === "header" ? cn(ELEVATED_HEADER_FLOAT, ELEVATED_HEADER_HOVER) : COMPACT_BUBBLE,
         )}
       >
-        <span className="truncate @max-4xl/chathead:hidden">{t("task.switch")}</span>
+        <span dir="auto" className="truncate @max-4xl/chathead:hidden">{current ? localizedTaskTitle(current.title?.trim() || t("task.newShort")) : t("task.switch")}</span>
         <span className="shrink-0 tabular-nums opacity-60 @max-4xl/chathead:opacity-100">{tasks.length}</span>
         {workingElsewhere > 0 && (
           <span
@@ -248,10 +254,10 @@ function ConversationTaskPicker({
       </button>
 
       {motion.shown && (
-        <div className={cn("absolute right-0 top-full z-40 mt-1 w-[300px] overflow-hidden", MENU_SHEET, motion.className)} {...motion.exitProps}>
-          <div>
-            <div className="flex items-center gap-2 rounded-md bg-ink/[0.05] px-2 py-1.5 focus-within:ring-2 focus-within:ring-focus/60">
-              <Search size={14} className="shrink-0 text-ink-secondary" />
+        <div data-task-menu className={cn("popover-surface absolute right-0 top-full z-40 mt-1 w-[300px] overflow-hidden rounded-xl border border-hairline/50 bg-card py-1 shadow-2xl shadow-black/50", motion.className)} {...motion.exitProps}>
+          <div className="px-2 pb-1 pt-1.5">
+            <div className="flex items-center gap-2 rounded-lg border border-hairline/40 bg-inset px-2.5 py-1.5 focus-within:border-focus">
+              <Search size={13} className="shrink-0 text-ink-secondary" />
               <input
                 autoFocus
                 value={query}
@@ -278,17 +284,17 @@ function ConversationTaskPicker({
                 }}
                 placeholder={t("task.search")}
                 aria-label={t("task.search")}
-                className="w-full bg-transparent text-[13px] text-ink placeholder:text-ink-tertiary focus:outline-none"
+                className="w-full bg-transparent text-[13px] text-ink placeholder:text-ink-secondary focus:outline-none"
               />
             </div>
           </div>
           <div className="max-h-[320px] overflow-y-auto" role="group" aria-label={looking ? t("task.matching", { count: results.length }) : t("task.list")}>
             {attentionRows.length > 0 && <div className="pb-1">
-              <div className="flex items-center gap-1.5 px-2 pb-1 pt-1.5 text-[12px] font-medium text-ink-secondary"><Activity size={14} />{t("attention.title")}</div>
-              <AttentionThreadRows inset entries={attentionRows} onJump={(entry) => { onAttentionJump?.(entry); closeMenu(); }} />
+              <div className="flex items-center gap-1.5 px-3 pb-1 pt-1.5 text-[11px] font-medium text-ink-secondary"><Activity size={12} />{t("attention.title")}</div>
+              <AttentionThreadRows entries={attentionRows} onJump={(entry) => { onAttentionJump?.(entry); closeMenu(); }} />
             </div>}
             {results.length === 0 ? (
-              <div className="px-2 py-6 text-center text-[13px] text-ink-secondary">
+              <div className="px-3 py-6 text-center text-[13px] text-ink-secondary">
                 {t("task.noMatch", { query: looking })}
               </div>
             ) : visible.map((task, index) => {
@@ -297,11 +303,11 @@ function ConversationTaskPicker({
               const heading = grouped?.find((group) => group.tasks[0]?.threadId === task.threadId)?.project;
               return (
                 <Fragment key={task.threadId}>
-                {bot?.projects?.length && heading ? <div className={cn("flex items-center gap-1.5 px-2 pb-1 pt-2 text-[12px] font-medium text-ink-secondary", index > 0 && "border-t border-hairline/30")}>{heading.id && <FolderIcon emoji={heading.emoji} size={12} />}{heading.name}</div> : null}
+                {bot?.projects?.length && heading ? <div className={cn("flex items-center gap-1.5 px-3 pb-1 pt-2 text-[11px] font-medium text-ink-secondary", index > 0 && "border-t border-hairline/30")}>{heading.id && <FolderIcon emoji={heading.emoji} size={12} />}{heading.name}</div> : null}
                 <div
-                  className={cn("group flex items-center gap-2 rounded-md px-2 py-1.5", active ? "bg-menu-active" : "hover:bg-menu-hover")}
+                  className={cn("group flex items-center gap-2 px-2.5 py-2", active ? "bg-raised/60" : "hover:bg-raised/40")}
                 >
-                  <Check size={14} className={cn("shrink-0", active ? "text-accent" : "opacity-0")} />
+                  <Check size={13} className={cn("shrink-0", active ? "text-accent" : "opacity-0")} />
                   {renaming === task.threadId ? (
                     <input
                       autoFocus
@@ -349,7 +355,7 @@ function ConversationTaskPicker({
                       className="min-w-0 flex-1 text-left"
                       title={t("task.renameHint")}
                     >
-                      <div dir="auto" className="truncate text-[14px] leading-[18px] text-ink">{localizedTaskTitle(task.title)}</div>
+                      <div dir="auto" className="truncate text-[13px] text-ink">{localizedTaskTitle(task.title)}</div>
                       <div className="text-[11px] text-ink-secondary">
                         {task.activity === "waiting-on-you" ? `${t("task.waiting")} · ` : task.waitingForTeammates ? `${t("task.waitingOnTeammate")} · ` : task.busy ? `${t("chat.activity.working")} · ` : task.unread ? `${t("task.unread")} · ` : ""}
                         <TaskUpdatedTime task={task} now={now} />
@@ -364,9 +370,9 @@ function ConversationTaskPicker({
                       onClick={() => onPin(task.threadId, task.pinned !== true)}
                       aria-label={task.pinned === true ? t("sidebar.bot.unpin") : t("sidebar.bot.pin")}
                       title={task.pinned === true ? t("sidebar.bot.unpin") : t("sidebar.bot.pin")}
-                      className="rounded-md p-1 text-ink-secondary opacity-0 hover:bg-menu-hover hover:text-ink focus-visible:opacity-100 group-hover:opacity-100 touch:opacity-70"
+                      className="rounded p-1 text-ink-secondary opacity-0 hover:bg-raised hover:text-ink focus-visible:opacity-100 group-hover:opacity-100 touch:opacity-70"
                     >
-                      {task.pinned === true ? <PinOff size={14} /> : <Pin size={14} />}
+                      {task.pinned === true ? <PinOff size={13} /> : <Pin size={13} />}
                     </button>
                   )}
                   {renaming !== task.threadId && (
@@ -375,13 +381,13 @@ function ConversationTaskPicker({
                       onClick={() => startRename(task)}
                       aria-label={t("task.renameNamed", { title: task.title })}
                       title={t("task.renameTitle")}
-                      className="rounded-md p-1 text-ink-secondary opacity-0 hover:bg-menu-hover hover:text-ink focus-visible:opacity-100 group-hover:opacity-100 touch:opacity-70"
+                      className="rounded p-1 text-ink-secondary opacity-0 hover:bg-raised hover:text-ink focus-visible:opacity-100 group-hover:opacity-100 touch:opacity-70"
                     >
-                      <SquarePen size={14} />
+                      <Pencil size={13} />
                     </button>
                   )}
-                  {bot && onMove && (bot.projects?.length ?? 0) > 0 && <label title={t("folder.move")} className="relative rounded-md p-1 text-ink-secondary opacity-0 hover:bg-menu-hover hover:text-ink focus-within:opacity-100 group-hover:opacity-100 touch:opacity-70">
-                    <FolderInput size={14} />
+                  {bot && onMove && (bot.projects?.length ?? 0) > 0 && <label title={t("folder.move")} className="relative rounded p-1 text-ink-secondary opacity-0 hover:bg-raised hover:text-ink focus-within:opacity-100 group-hover:opacity-100 touch:opacity-70">
+                    <FolderInput size={13} />
                     <select aria-label={t("folder.moveNamed", { title: task.title })} value={bot.projects?.some((project) => project.id === task.projectId) ? task.projectId : ""}
                       onFocus={clearDismiss} onChange={(event) => { clearDismiss(); onMove(task.threadId, event.target.value || null); }}
                       className="absolute inset-0 w-full cursor-pointer opacity-0">
@@ -395,26 +401,25 @@ function ConversationTaskPicker({
                     disabled={Boolean(task.busy) || busy && active}
                     aria-label={t("task.deleteAria")}
                     title={t("task.deleteTitle")}
-                    className="rounded-md p-1 text-ink-secondary opacity-0 hover:bg-menu-hover hover:text-danger focus-visible:opacity-100 group-hover:opacity-100 disabled:opacity-20 touch:opacity-70 touch:disabled:opacity-20"
+                    className="rounded p-1 text-ink-secondary opacity-0 hover:bg-raised hover:text-danger focus-visible:opacity-100 group-hover:opacity-100 disabled:opacity-20 touch:opacity-70 touch:disabled:opacity-20"
                   >
-                    <Trash2 size={14} />
+                    <Trash2 size={13} />
                   </button>
                 </div>
                 </Fragment>
               );
             })}
           </div>
-          <div role="separator" className={MENU_ITEM_SEPARATOR} />
-          {bot ? <NewThreadButton bot={bot} onCreated={closeMenu} className="min-h-[30px] w-full rounded-md px-2 text-[14px] text-ink hover:bg-menu-hover" /> : <button
+          {bot ? <NewThreadButton bot={bot} onCreated={closeMenu} className="mt-1 w-full rounded-none border-t border-hairline/40" /> : <button
             type="button"
             onClick={() => {
               onNew();
               closeMenu();
             }}
             disabled={busy}
-            className="flex min-h-[30px] w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[14px] text-ink hover:bg-menu-hover disabled:opacity-40"
+            className="mt-1 flex w-full items-center gap-2 border-t border-hairline/40 px-3 py-2 text-left text-[13px] text-ink hover:bg-raised/50 disabled:opacity-40"
           >
-            <SquarePen size={16} className="text-ink-secondary" /> {t("task.newShort")}
+            <Plus size={13} className="text-ink-secondary" /> {t("task.newShort")}
           </button>}
         </div>
       )}
@@ -445,12 +450,13 @@ export function BotActivityPicker({ bot }: { bot: Bot }) {
   );
 }
 
-export function TaskPicker({ bot }: { bot: Bot }) {
+export function TaskPicker({ bot, variant = "default" }: { bot: Bot; variant?: "default" | "header" }) {
   const { state, dispatch } = useStore();
   const showThreads = useShowThreads();
   if (!showThreads) return null;
   return (
     <ConversationTaskPicker
+      variant={variant}
       threadId={bot.threadId}
       tasks={orderedThreadList((bot.tasks ?? []).filter((task) => !task.routineRunId))}
       busy={false}

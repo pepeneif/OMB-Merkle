@@ -22,11 +22,16 @@ export function botTooltip(bot: Pick<Bot, "name" | "title" | "chiefOfStaff" | "m
   ].filter(Boolean).join(" · ");
 }
 
+/** A16 (v140): Jose pidio que el logo del proveedor NO se imponga sobre el avatar del bot.
+ *  Para volver al comportamiento anterior, poner `SHOW_PROVIDER_MARK = true`. */
+export const SHOW_PROVIDER_MARK = false;
+
 export function BotModelBadge({ bot, instances, avatarSize }: {
   bot: Pick<Bot, "modelSelection">;
   instances: InstanceInfo[];
   avatarSize: number;
 }) {
+  if (!SHOW_PROVIDER_MARK) return null;
   const model = botModel(bot, instances);
   if (!model) return null;
   const size = Math.max(14, Math.round(avatarSize * 0.4));

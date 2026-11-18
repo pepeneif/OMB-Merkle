@@ -86,11 +86,11 @@ describe("bot-first sidebar", () => {
   });
 
   it.each([
-    { advanced: true, enabled: true, density: "comfortable", size: 32, spacing: ["gap-2", "py-2", "pl-6"] },
-    { advanced: true, enabled: true, density: "icons", size: 44, spacing: ["justify-center", "px-1", "py-1.5"] },
-    { advanced: true, enabled: false, density: "comfortable", size: 44, spacing: ["gap-3", "py-2", "pl-2.5", "pr-9"] },
-    { advanced: false, enabled: false, density: "comfortable", size: 42, spacing: ["gap-2", "rounded-[8px]", "pl-2", "pr-2", "md:h-[54px]"] },
-    { advanced: false, enabled: false, density: "icons", size: 36, spacing: ["h-[54px]", "justify-center"] },
+    { advanced: true, enabled: true, density: "comfortable", size: 29, spacing: ["gap-2", "py-2", "pl-6"] },
+    { advanced: true, enabled: true, density: "icons", size: 40, spacing: ["justify-center", "px-1", "py-1.5"] },
+    { advanced: true, enabled: false, density: "comfortable", size: 40, spacing: ["gap-3", "py-2", "pl-2.5", "pr-9"] },
+    { advanced: false, enabled: false, density: "comfortable", size: 38, spacing: ["gap-2", "rounded-[8px]", "pl-2", "pr-2", "md:h-[54px]"] },
+    { advanced: false, enabled: false, density: "icons", size: 32, spacing: ["h-[54px]", "justify-center"] },
   ] as const)("sizes bot portraits and row spacing in $density density with threads $enabled (advanced $advanced)", ({ advanced, enabled, density, size, spacing }) => {
     fixture.advanced = advanced;
     fixture.showThreads = enabled;
@@ -167,15 +167,15 @@ describe("bot-first sidebar", () => {
     expect(markup).toMatch(/data-bot-actions="atlas"[^>]*class="[^"]*end-\[3px\] top-1\.5 size-6 translate-y-0\b/);
   });
 
-  it("fades the collapsed rail's engine badge in both modes", () => {
+  it("hides the collapsed rail's engine badge in both modes", () => {
     fixture.showThreads = false;
     fixture.state = { ...fixture.state, instances: [{ instanceId: "fake", driverKind: "claudeAgent", displayName: "Claude" }] as unknown as AppState["instances"] };
     const candidate = { ...bot, tasks: [], projects: [] };
     const rail = renderToStaticMarkup(createElement(BotListItem, rowProps("icons", candidate)));
-    expect(rail).toMatch(/<span data-testid="model-badge"[^>]*><span data-provider-mark="brand" class="[^"]*\bopacity-60\b/);
+    expect(rail).not.toContain("data-provider-mark");
     fixture.advanced = true;
     const advanced = renderToStaticMarkup(createElement(BotListItem, rowProps("icons", candidate)));
-    expect(advanced).toMatch(/<span data-testid="model-badge"[^>]*><span data-provider-mark="brand" class="[^"]*\bopacity-60\b/);
+    expect(advanced).not.toContain("data-provider-mark");
   });
 
   it("shows a waiting Simple row as an amber dot and preview, and a working one as a ring-cut dot on the avatar, with no badge or live region", () => {
@@ -271,7 +271,7 @@ describe("bot-first sidebar", () => {
     expect(markup).toContain('<span class="sr-only">Unread</span>');
   });
 
-  it("draws no engine mark for a bot with no AI yet or in a group chat, and a faded one in Advanced mode", () => {
+  it("never draws an engine mark: no AI yet, a group chat, or Advanced mode", () => {
     fixture.showThreads = false;
     fixture.state = { ...fixture.state, instances: [{ instanceId: "fake", driverKind: "claudeAgent", displayName: "Claude" }] as unknown as AppState["instances"] };
     const candidate = { ...bot, tasks: [], projects: [] };
@@ -280,7 +280,7 @@ describe("bot-first sidebar", () => {
     expect(renderToStaticMarkup(createElement(GroupListItem, { group, density: "comfortable", onMenu: vi.fn() }))).not.toContain("data-provider-mark");
     fixture.advanced = true;
     const advanced = renderToStaticMarkup(createElement(BotListItem, rowProps("comfortable", candidate)));
-    expect(advanced).toMatch(/data-testid="model-badge"[^>]*><span data-provider-mark="brand" class="[^"]*\bopacity-60\b/);
+    expect(advanced).not.toContain("data-provider-mark");
   });
 
   it("keeps a Simple row to its name, preview and one faded engine mark, naming role, Chief and engine in its tooltip", () => {

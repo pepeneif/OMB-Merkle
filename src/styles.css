@@ -355,7 +355,7 @@
   --color-accent-text: #96551f;   /* for links on a light ground — 5.81:1 */
   --color-focus: #96551f;         /* the ring rides the accent, not Grok blue */
   --color-accent-ink: #ffffff;
-  --color-bubble-user: #f2e9dc;   /* your own messages in the badge beige */
+  --color-bubble-user: #ffffff;   /* 0025 (A6, v140): BLANCO, igual que la burbuja del agente (#ffffff = --color-card) */
   --color-bubble-user-ink: #1a1a18;   /* = ink: unchanged */
 
   --color-success: #3f6b47;
@@ -1239,12 +1239,65 @@
   line-height: 1.75;
   font-family: "omb-chat", var(--font-sans);
 }
+/* A markdown body makes its own line breaks (one per paragraph, plus an explicit <br>
+   for each newline inside a paragraph), so it must not inherit the user bubble's
+   white-space: pre-wrap: the renderer also emits a literal newline right after that
+   <br>, which pre-wrap would paint as a second, empty line. Plain text keeps it. */
+.chat-md {
+  white-space: normal;
+}
 .chat-md :is(strong, b) {
   font-weight: 600;
 }
+
+/* ────────────────────────────────────────────────────────────────────────
+   PERSONALIZACION MANAGER (0010, portada a la 140) — ancho de burbujas
+   ajustable por el usuario. Cada burbuja toma su max-width de una variable en
+   :root; el mango de arrastre vive en el borde libre (derecha en las del bot,
+   izquierda en las del usuario y en "This run"). Sin arrastrar, manda el valor
+   por defecto de la hoja.
+   ──────────────────────────────────────────────────────────────────────── */
+.bbl {
+  position: relative;
+}
+.bbl-bot {
+  max-width: min(var(--bubble-bot, var(--chat-bubble-max)), var(--chat-bubble-pct));
+}
+.bbl-user {
+  max-width: min(var(--bubble-user, var(--chat-bubble-max)), var(--chat-bubble-pct));
+}
+.bbl-run {
+  width: min(var(--bubble-run, 22rem), var(--chat-card-pct));
+  max-width: var(--chat-card-pct);
+}
+/* El mango solo existe en escritorio: en tactil no hay hover y chocaria con el
+   scroll y la seleccion de texto. Delgado, mas transparente y con un margen
+   arriba/abajo para no tocar la curvatura de la esquina de la burbuja. */
+.bbl-handle {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  width: 4px;
+  cursor: col-resize;
+  touch-action: none;
+  opacity: 0;
+  border-radius: 9999px;
+  transition: opacity 120ms ease, background-color 120ms ease;
+}
+.bbl-bot > .bbl-handle { right: -7px; }
+.bbl-user > .bbl-handle { left: -7px; }
+.bbl-run > .bbl-handle { left: -7px; }
+.bbl:hover > .bbl-handle,
+.bbl-handle:focus-visible {
+  opacity: 1;
+  background-color: color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+@media (hover: none) {
+  .bbl-handle { display: none; }
+}
 [data-chat-bubble="simple"] :is(.chat-md, .chat-text),
 [data-chat-bubble="simple"].chat-text {
-  line-height: 22px;
+  line-height: 25px;
 }
 [data-chat-bubble="simple"] .chat-md > * + * {
   margin-top: 10px;
@@ -1917,22 +1970,24 @@ body {
   --glass-edge: 20px;
   isolation: isolate;
 }
+/* Variante B (2026-11-07): la barra va SOLIDA, sin transparencia ni efecto vidrio,
+   como en la v0.1.130 (parche 0024 A1). */
 .glass-bar::before {
   content: "";
   position: absolute;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background: color-mix(in srgb, var(--glass-tint, var(--color-panel)) 55%, transparent);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  backdrop-filter: blur(24px) saturate(180%);
+  background: var(--glass-tint, var(--color-panel));
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 .glass-bar[data-glass-bar="top"]::before {
-  mask-image: linear-gradient(to bottom, black calc(100% - var(--glass-edge)), transparent);
+  mask-image: none;
 }
 .glass-bar[data-glass-bar="bottom"]::before {
   top: calc(-1 * var(--glass-reach, 0px));
-  mask-image: linear-gradient(to top, black calc(100% - var(--glass-reach, 0px)), transparent);
+  mask-image: none;
 }
 /* A fading bar has no tint and no blur. What scrolls under it stays hidden at the window edge and is
    at most a tenth visible at the bar's inner edge, across the last --glass-fade of the bar, which is
@@ -1942,7 +1997,8 @@ body {
   --glass-fade: 60px;
 }
 .glass-bar[data-glass-fade]::before {
-  background: linear-gradient(to bottom, var(--color-app), var(--color-app) calc(100% - var(--glass-fade)), color-mix(in srgb, var(--color-app) 90%, transparent));
+  /* Variante B: color de la app solido, sin degradado. */
+  background: var(--color-app);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   mask-image: none;
@@ -3535,6 +3591,27 @@ button:disabled.bg-danger {
 
 .user-bubble-colored {
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.16);
+}
+
+/* A6 + A10 (v140): en Atelier el fondo de MIS mensajes es BLANCO aunque "Color my messages"
+   este encendido (el color del bot se indica con el borde de A10, no con el relleno).
+   La tinta del tono del bot es clara (pensada para su relleno de color), asi que sobre el
+   blanco forzado hay que devolver los tokens de tinta de Atelier o el texto queda invisible. */
+[data-skin="atelier"] .user-bubble-colored {
+  background-color: #ffffff !important;
+  background-image: none !important;
+  --color-ink: #1a1a18 !important;
+  --color-ink-secondary: #6b6559 !important;
+  --color-ink-tertiary: #6d685c !important;
+  --color-bubble-user-ink: #1a1a18 !important;
+  /* The tone's own link colour is picked against its coloured fill, so on the forced white it all but vanishes
+     (a bare URL read as blank). White needs Atelier's link tone, the one the skin measured on white. */
+  --color-accent: #a05f25 !important;
+  --color-accent-text: #96551f !important;
+  --color-accent-border: #b06a2c !important;
+  --color-focus: #96551f !important;
+  --bubble-selection: #d9d2c6 !important;
+  --bubble-selection-ink: #1a1a18 !important;
 }
 [data-chat-bubble="simple"].user-bubble-colored {
   box-shadow: inset 0 0.5px 0 rgb(255 255 255 / 0.16);

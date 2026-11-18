@@ -14,7 +14,7 @@ import { pickerPlacement, type PickerPlacement } from "@/lib/picker-placement";
 import type { Typeahead } from "@/lib/menu-keys";
 import { usePopoverDismiss } from "@/hooks/use-popover-dismiss";
 import { InstanceProviderMark } from "./ProviderIcons";
-import { ELEVATED_FLOAT, ELEVATED_HOVER } from "./elevated";
+import { ELEVATED_HEADER_FLOAT, ELEVATED_HEADER_HOVER } from "./elevated";
 import { ApiKeyHint, EngineSetup, EngineUpdateNotice, InstanceAccountNotes, needsCli, needsSignIn, openKeysFor } from "./EngineSetup";
 import { offersLocalModels, probeLocalModels } from "./local-model-probe";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -35,6 +35,7 @@ import { t } from "@/lib/i18n";
 import { COMPACT_SQUARE } from "@/lib/compact-chip";
 import { useAiSwitch } from "@/lib/ai-switch";
 import { usePickerPane } from "@/lib/model-picker-pane";
+import { useModelPickerOpen } from "@/lib/model-picker-open";
 import { threadsOnOwnModel } from "../../shared/thread-model";
 import { ThreadModelsLine } from "./ThreadModelsLine";
 import { USAGE_WARN_WIDENS, UsageBars, UsageMenuRows } from "./EngineUsage";
@@ -206,6 +207,7 @@ export function ModelPicker({
   className,
   contained = false,
   label,
+  hideTrigger = false,
   size = "md",
 }: {
   bot: Bot;
@@ -213,6 +215,8 @@ export function ModelPicker({
   className?: string;
   contained?: boolean;
   label?: ReactNode;
+  /** The trigger is not drawn: the picker only opens when something else asks it to (the chat's ⋯ menu). */
+  hideTrigger?: boolean;
   size?: "sm" | "md";
 }) {
   const { dispatch: storeDispatch, refreshInstances, refreshModels: refreshInstanceModels } = useStoreActions(), state = useStoreSelector((s) => ({ instances: s.instances, modelVariantSessions: s.modelVariantSessions, profile: s.bots.find((candidate) => candidate.id === shown.id) }), sameFields);
@@ -602,6 +606,10 @@ export function ModelPicker({
     title: `${summary}${followLine}${attentionLine}${busyLine}`,
   };
 
+  // A request from the chat's ⋯ menu opens this picker directly, where it is mounted (the chat header in Advanced
+  // mode), rather than sending the person to Settings. The row only names the model in its own words.
+  useModelPickerOpen(threadId, openMenu);
+
   const trigger = advanced ? (
     <button
       {...triggerProps}
@@ -609,7 +617,7 @@ export function ModelPicker({
         "group flex items-center gap-1.5 rounded-full py-1 pl-2 pr-2.5 text-[13px] text-ink disabled:cursor-not-allowed",
         contained
           ? "hover:bg-ink/[0.06] aria-expanded:bg-ink/[0.08] disabled:opacity-50 disabled:hover:bg-transparent"
-          : cn(ELEVATED_FLOAT, ELEVATED_HOVER, "disabled:text-ink-tertiary disabled:hover:bg-composer"),
+          : cn(ELEVATED_HEADER_FLOAT, ELEVATED_HEADER_HOVER, "disabled:text-ink-tertiary disabled:hover:bg-composer"),
         !contained && active && !showActiveAccount && cn(COMPACT_SQUARE, USAGE_WARN_WIDENS),
       )}
     >
@@ -654,7 +662,7 @@ export function ModelPicker({
         "group flex items-center rounded-full text-[13px] leading-[18px] text-ink-secondary disabled:cursor-not-allowed disabled:text-ink-tertiary",
         contained
           ? "min-w-0 max-w-[72%] transition-colors duration-150 hover:bg-ink/[0.06] hover:text-ink aria-expanded:bg-ink/[0.08] aria-expanded:text-ink disabled:hover:bg-transparent"
-          : cn("shrink-0", ELEVATED_FLOAT, ELEVATED_HOVER, "hover:text-ink aria-expanded:text-ink disabled:hover:bg-composer"),
+          : cn("shrink-0", ELEVATED_HEADER_FLOAT, ELEVATED_HEADER_HOVER, "hover:text-ink aria-expanded:text-ink disabled:hover:bg-composer"),
         size === "sm" ? "h-7 pl-2 pr-1.5" : "h-8 pl-2.5 pr-2",
       )}
     >
@@ -996,12 +1004,13 @@ export function ModelPicker({
   return (
     <div ref={rootRef} className={cn(contained ? "w-full" : "relative", className)}>
       {contained ? (
-        <div className="flex items-center justify-between gap-4">
+        hideTrigger ? <button {...triggerProps} aria-hidden="true" tabIndex={-1} className="pointer-events-none absolute size-0 opacity-0" /> : <div className="flex items-center justify-between gap-4">
           {label}
           {trigger}
         </div>
       ) : (
-        trigger
+        // Hidden: an invisible zero-size anchor where the picker would sit, so its popover places here (the header).
+        hideTrigger ? <button {...triggerProps} aria-hidden="true" tabIndex={-1} className="pointer-events-none absolute size-0 opacity-0" /> : trigger
       )}
       {menu && floating ? createPortal(menu, document.body) : menu}
       {!contained && changedBotModel && !open && ownModelThreads > 0 && (

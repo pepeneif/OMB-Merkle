@@ -10,6 +10,7 @@ import { t } from "@/lib/i18n";
 import { cn } from "@/lib/cn";
 import { useAdvancedMode } from "@/lib/interface-mode";
 import { remarkMentions, sameMentionPerson, type MentionPeer, type MentionPerson } from "@/lib/mentions";
+import { remarkUnderline } from "@/lib/remark-user-format";
 import { createMarkdownRenderCache } from "@/lib/markdown-render-cache";
 import { closedFence, openFence, splitMarkdownBlocks } from "@/lib/markdown-stream-blocks";
 import { StreamingReplyContext } from "@/state/live-reply";
@@ -810,11 +811,11 @@ function markdownParts(text: string, streaming: boolean): MarkdownPart[] {
   });
 }
 
-function ChatMarkdownComponent({ text, message, mentionPeers = NO_MENTION_PEERS, everyone = false, mentionPerson, delivered, originals }: {
+function ChatMarkdownComponent({ text, message, mentionPeers = NO_MENTION_PEERS, everyone = false, mentionPerson, delivered, originals, underline = false }: {
   text: string; message?: MessageAttachmentContext;
   mentionPeers?: readonly MentionPeer[]; everyone?: boolean; mentionPerson?: MentionPerson;
   /** Delivered copies by file name, and the originals those copies came from (copy path -> original). */
-  delivered?: DeliveredFiles; originals?: DeliveredFiles;
+  delivered?: DeliveredFiles; originals?: DeliveredFiles; underline?: boolean;
 }) {
   // use() may be called conditionally: only a message that can hold a thread link subscribes to the thread list.
   const { threads, currentBotId } = MAY_LINK_THREAD.test(text) ? use(ThreadRefsContext) : NO_THREAD_REFS;
@@ -841,10 +842,10 @@ function ChatMarkdownComponent({ text, message, mentionPeers = NO_MENTION_PEERS,
   const linksThreads = threads.length > 0;
   const draw = ({ text: partText, source, finished }: MarkdownPart) => {
     const mentions = source.includes("@");
-    const variant = `${mathPlugin ? "math" : ""}\u0003${mentions ? `${peerSignature(mentionPeers)}\u0001${everyone ? 1 : 0}\u0001${mentionPerson?.profileName ?? ""}` : ""}\u0003${linksThreads ? `${threadListId(threads)}\u0001${currentBotId ?? ""}` : ""}`;
+    const variant = `${underline ? "u" : ""}\u0003${mathPlugin ? "math" : ""}\u0003${mentions ? `${peerSignature(mentionPeers)}\u0001${everyone ? 1 : 0}\u0001${mentionPerson?.profileName ?? ""}` : ""}\u0003${linksThreads ? `${threadListId(threads)}\u0001${currentBotId ?? ""}` : ""}`;
     // Markdown is a plain function of its options (no hooks), so its elements can be kept and drawn again.
     const render = () => {
-      const remarkPlugins = [...BASE_REMARK_PLUGINS];
+      const remarkPlugins = [...(underline ? [remarkUnderline] : []), ...BASE_REMARK_PLUGINS];
       if (mentions) remarkPlugins.push([remarkMentions, { peers: mentionPeers, everyone, person: mentionPerson }]);
       if (linksThreads) remarkPlugins.push(remarkThreadRefs(threads, currentBotId));
       return Markdown({ children: source, remarkPlugins, rehypePlugins: rehypePluginsFor(mathPlugin), urlTransform: chatUrlTransform, components: MARKDOWN_COMPONENTS });
@@ -882,6 +883,7 @@ export const ChatMarkdown = memo(ChatMarkdownComponent, (previous, next) => (
   && previous.message?.threadId === next.message?.threadId
   && previous.message?.messageId === next.message?.messageId
   && sameDelivered(previous.delivered, next.delivered) && sameDelivered(previous.originals, next.originals)
+  && previous.underline === next.underline
 ));
 
 function sameDelivered(previous: DeliveredFiles | undefined, next: DeliveredFiles | undefined): boolean {

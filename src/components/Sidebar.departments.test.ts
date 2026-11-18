@@ -106,7 +106,7 @@ const at = (offset = 27) => ({
 });
 function drag(id: string) {
   carried = transfer();
-  row(id).botDrag!.row(id).onDragStart(at() as never);
+  row(id).botDrag!.handle(id).onDragStart(at() as never);
 }
 
 beforeEach(() => {
@@ -149,7 +149,7 @@ describe("Simple's sidebar before anyone drags", () => {
     for (const props of rows()) {
       expect(props.botDrop).toBeNull();
       expect(props.botDragging).toBe(false);
-      expect(props.botDrag!.row(props.bot.id).draggable).toBe(true);
+      expect(props.botDrag!.handle(props.bot.id).draggable).toBe(true);
     }
     expect(headers().every((props) => !props.dropInto && !props.naming)).toBe(true);
   });
@@ -160,15 +160,13 @@ describe("Simple's sidebar before anyone drags", () => {
   });
 
   it("keeps every row draggable in the icons-only rail, where the whole tile is the drag source", () => {
-    // The rail (density "icons") collapses the sidebar to bot tiles. sections.interactive is false there, so the
-    // arrange used to answer with no drag handles at all and the rail could not be reordered.
     fixture.storage.set(SIDEBAR_DENSITY_KEY, "avatars");
     const icons = rows();
     expect(icons.length).toBeGreaterThan(0);
     for (const props of icons) {
       expect(props.density).toBe("icons");
       expect(props.botDragging).toBe(false);
-      expect(props.botDrag!.row(props.bot.id).draggable).toBe(true);
+      expect(props.botDrag!.handle(props.bot.id).draggable).toBe(true);
     }
   });
 
@@ -221,31 +219,22 @@ describe("dragging a bot", () => {
     expect(rows().every((props) => !props.botDrop && !props.botDragging)).toBe(true);
   });
 
-  it("onto the middle of a bot puts both in a new department, named in place, and Enter keeps the name", () => {
+  it("drops on the lower half of a row to sit after it, reordering instead of starting a department", () => {
     drag("cleo");
     row("atlas").botDrag!.row("atlas").onDragOver(at() as never);
-    expect(row("atlas").botDrop).toBe("group");
+    expect(row("atlas").botDrop).toBe("after");
     row("atlas").botDrag!.row("atlas").onDrop(at() as never);
-    expect(actions()).toEqual([]);
-    expect(sections()).toEqual([BOTS_SECTION_ID, CHANNELS_SECTION_ID, userSectionId("Work"), userSectionId(NEW_DEPARTMENT)]);
-    const naming = header(NEW_DEPARTMENT).naming!;
-    expect(naming.value).toBe("New department");
-    expect(naming.label).toBe("New department name");
-    expect(listed()).toEqual(["bea", "dodo", "echo", "atlas", "cleo"]);
-    naming.onCommit("  ");
-    expect(actions()).toEqual([
-      { type: "updateBot", botId: "atlas", patch: { section: "New department" } },
-      { type: "updateBot", botId: "cleo", patch: { section: "New department" } },
-    ]);
+    expect(actions()).toEqual([{ type: "botsOrdered", botIds: ["atlas", "cleo", "bea"] }]);
+    expect(sections()).toEqual([BOTS_SECTION_ID, CHANNELS_SECTION_ID, userSectionId("Work")]);
     expect(sections()).not.toContain(userSectionId(NEW_DEPARTMENT));
   });
 
-  it("gives a new department the first free name, and Escape puts the bots back", () => {
+  it("names a department started from a bot's menu, giving it the first free name, and Escape puts the bot back", () => {
     fixture.state = { ...fixture.state, sections: ["Work", "New department"] };
-    drag("cleo");
-    row("bea").botDrag!.row("bea").onDrop(at() as never);
+    carried = transfer();
+    const menu = render().find((node) => node.type === BotContextMenu)!.props as unknown as { onNewSection: (botId: string) => void };
+    menu.onNewSection("cleo");
     expect(header(NEW_DEPARTMENT).naming!.value).toBe("New department 2");
-    drag("atlas");
     const over = at();
     section(userSectionId(NEW_DEPARTMENT)).onDragOver(over as never);
     expect(over.preventDefault).not.toHaveBeenCalled();
@@ -337,11 +326,11 @@ describe("dragging a bot", () => {
     expect(actions()).toEqual([]);
   });
 
-  it("works the same in Advanced, where the bots' list has a heading", () => {
+  it("reorders the same in Advanced, where the bots' list has a heading", () => {
     fixture.advanced = true;
     drag("dodo");
     row("atlas").botDrag!.row("atlas").onDrop(at() as never);
-    expect(header(NEW_DEPARTMENT).naming!.value).toBe("New department");
+    expect(actions()).toEqual([{ type: "updateBot", botId: "dodo", patch: { section: "" } }, { type: "botsOrdered", botIds: ["atlas", "dodo", "bea", "cleo"] }]);
   });
 });
 
@@ -387,7 +376,7 @@ describe("who may drag a bot: whoever the bot menu offers Move to department", (
     expect(listed()).toEqual(["atlas", "bea", "cleo", "dodo", "echo"]);
     expect(rows().map((props) => props.botDrag)).toEqual([undefined, undefined, undefined, undefined, undefined]);
     carried = transfer();
-    drawnEarlier.row("atlas").onDragStart(at() as never);
+    drawnEarlier.handle("atlas").onDragStart(at() as never);
     drawnEarlier.step("atlas", 1);
     expect(carried.types).toEqual([]);
     expect(actions()).toEqual([]);
@@ -404,7 +393,7 @@ describe("who may drag a bot: whoever the bot menu offers Move to department", (
 
   it("lets an admin drag", () => {
     fixture.admin = true;
-    for (const props of rows()) expect(props.botDrag!.row(props.bot.id).draggable).toBe(true);
+    for (const props of rows()) expect(props.botDrag!.handle(props.bot.id).draggable).toBe(true);
     drag("atlas");
     section(userSectionId("Work")).onDrop(at() as never);
     expect(actions()).toEqual([{ type: "updateBot", botId: "atlas", patch: { section: "Work" } }, { type: "botsOrdered", botIds: ["dodo", "echo", "atlas"] }]);
