@@ -63,7 +63,7 @@ describe("pinned background model", () => {
     const previous = process.env.OMB_BACKGROUND_MODEL;
     process.env.OMB_BACKGROUND_MODEL = "deepseek/deepseek-v4.1-flash-1017";
     try {
-      expect(codexBackgroundRoute(openrouter, true, { model: "openrouter::deepseek/deepseek-v4.1-flash-1017" }))
+      expect(codexBackgroundRoute(openrouter, true, { model: "openrouter::deepseek/deepseek-v4.1-flash-1017", refused: new Set<string>(), onRefused: () => {} }))
         .toEqual({ model: "openrouter::deepseek/deepseek-v4.1-flash-1017" });
     } finally {
       if (previous === undefined) delete process.env.OMB_BACKGROUND_MODEL;

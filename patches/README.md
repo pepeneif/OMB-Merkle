@@ -49,7 +49,34 @@ Cada parche se genera con `git diff --binary` del commit correspondiente del for
 
 | 019 | `019-v165-concesion-renovable.patch` | Escritorio del VPS: la concesion del 018 se renueva con cada sonda buena (antes caducaba a los 3 min y el turno siguiente pagaba los 6-8 s de la inspeccion completa). TTL de 3 a 10 min y techo duro de 30 min, que fuerza una inspeccion completa aunque la sonda responda, para que nada se apoye en una sola lectura en toda la sesion | v165 (2026-11-17) | `server/vps-computer.ts` (+ pruebas) |
 
+| 020 | `020-v165-no-seguir-cambio-de-hilo.patch` | El cliente ya no sigue en silencio un cambio de hilo que hace el servidor (una rutina que abre su propio hilo, un hilo borrado que pasa el turno al siguiente): conserva el chat que se esta leyendo, marca el otro hilo como no leido y, si llega el brief del dia, avisa en vez de abrirselo encima. El cambio pedido a mano (`switchTask`) y el hilo que de verdad desaparecio siguen funcionando igual | v165 (2026-11-17) | `src/state/store.tsx`, `src/state/thread-move.ts`, `src/hooks/use-presence.ts`, `src/locales/{en,es}.json` (+ pruebas) |
+| 021 | `021-v165-urls-como-ligas.patch` | Un URL escrito suelto (sin comillas invertidas) en el mensaje del usuario se dibuja como liga y abre en ventana nueva, igual que los del bot; en Atelier la liga dentro de la burbuja blanca recupera su tono (antes quedaba casi invisible) | v165 (2026-11-17) | `src/lib/remark-user-format.ts`, `src/styles.css` (+ prueba) |
+
 ## Notas
+- El 020 va despues del 019. Toca el reducer del cliente (`src/state/store.tsx`), el nuevo
+  `src/state/thread-move.ts` y la presencia; ningun otro parche toca esos archivos. La regla nueva:
+  un frame o una rehidratacion que mueve `bot.threadId` sin que el cliente lo haya pedido
+  (`switchingTo`) y con el hilo en pantalla todavia en la lista NO cambia el chat; el otro hilo
+  queda marcado como no leido. Cambio de contrato: `snapshot-navigation.test.ts` ya no exige
+  aceptar el hilo del servidor al reconectar.
+- El 021 va despues del 020. Toca el formateo del texto del usuario y el CSS de Atelier; ningun
+  otro parche toca esos archivos. Si otro parche cambia las ligas o el tono de la burbuja, este
+  va despues.
+
+## Despliegue del 020 y el 021 (2026-11-18)
+
+- **Solo beta.** `beta.merkle.space` corre el bundle con los dos parches desde el 2026-11-18 00:55 UTC,
+  copiado en caliente dentro del contenedor `omb-v165-omb-1` (imagen `v0.1.165-r10`), **sin parar ni
+  recrear nada**: Jose pidio no reiniciar porque habia otro proceso trabajando. Los hashes del `dist`
+  del contenedor son identicos a los del arbol.
+- **Alfa no se toca.** `alfa.merkle.space` ya esta en la v167; los dos parches son de la linea v165.
+- **Falta hornear `r11`** para que el cambio sobreviva a una recreacion del contenedor (copiar `dist` y
+  `dist-server`, con `pnpm build:server` antes).
+- De paso se corrigio una prueba que ya fallaba antes de estos parches: en
+  `server/drivers/background-model-selection.test.ts:66` el `SmallModelFallback` del 014 se pasaba sin
+  `refused` ni `onRefused`, y `tsc -b` del script `build` se detenia ahi. Los dos campos son obligatorios
+  desde el commit del upstream `878e32cb9`; se agregaron al literal de la prueba.
+
 
 - El 019 va despues del 018 y toca los mismos dos archivos: aplica en secuencia, no suelto.
   La sonda barata sigue siendo la misma; solo renueva la concesion y se respeta el techo de 30 min.

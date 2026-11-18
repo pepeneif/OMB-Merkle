@@ -1,0 +1,308 @@
+diff --git a/src/hooks/use-presence.test.ts b/src/hooks/use-presence.test.ts
+index 23328e4db..f6c44e4da 100644
+--- a/src/hooks/use-presence.test.ts
++++ b/src/hooks/use-presence.test.ts
+@@ -205,6 +205,21 @@ describe("usePresence", () => {
+     ]);
+   });
+ 
++  it("never takes the screen from a chat being read: the brief waits, marked, with a line saying where", async () => {
++    stubDom();
++    fixture.api.mockResolvedValue(toChief);
++    const dispatch = vi.fn();
++    const reading: AppState = { ...loaded, bots: [{ ...chief, threadId: "chief-2" }], selectedId: "chief" };
++    render(reading, dispatch);
++    await flush();
++    const actions = dispatch.mock.calls.map(([action]) => action as Action);
++    expect(actions.some((action) => action.type === "switchTask")).toBe(false);
++    expect(actions.find((action) => action.type === "notice")).toMatchObject({ notice: { kind: "note" } });
++    expect(actions.find((action) => action.type === "botPatched")).toMatchObject({
++      bot: { tasks: expect.arrayContaining([expect.objectContaining({ threadId: "chief-main", unread: true })]) },
++    });
++  });
++
+   it("removes every listener it added when it unmounts", () => {
+     const dom = stubDom();
+     fixture.api.mockResolvedValue({ ok: true, returned: false });
+diff --git a/src/hooks/use-presence.ts b/src/hooks/use-presence.ts
+index f205e69de..3370e3a95 100644
+--- a/src/hooks/use-presence.ts
++++ b/src/hooks/use-presence.ts
+@@ -1,4 +1,5 @@
+ import { useEffect, useRef } from "react";
++import { t } from "@/lib/i18n";
+ import { useLanguageChoice } from "@/lib/language-preference";
+ import { duePing, openTarget, presenceBody, shownLanguage } from "@/lib/presence-client";
+ import { useShowThreads } from "@/lib/thread-preferences";
+@@ -21,7 +22,8 @@ function openChat(state: AppState): string | undefined {
+ }
+ 
+ /** Tells the server the person is here and which chat they have open, and opens the chat the answer names: the brief the
+- * Chief posted for this arrival. */
++ * Chief posted for this arrival. Never out of a conversation being read: there the brief waits, marked, with a line
++ * saying where it is. */
+ export function usePresence(state: AppState, dispatch: (action: Action) => void): void {
+   const showThreads = useShowThreads();
+   const lastPing = useRef<number | null>(null);
+@@ -42,7 +44,15 @@ export function usePresence(state: AppState, dispatch: (action: Action) => void)
+       void api("/api/presence/active", { method: "POST", body: JSON.stringify(body) }).then((answer) => {
+         const live = latest.current;
+         const target = existingThreadTarget(openTarget(answer), live.state);
+-        if (target && selection(live.state) === sentFrom) openThread(live.dispatch, target, live.state, live.showThreads);
++        if (!target || selection(live.state) !== sentFrom) return;
++        // The brief takes the screen only when it is the chat already open, or when no chat is being read.
++        const reading = live.state.activeView === "chat" ? openChat(live.state) : undefined;
++        if (!reading || reading === target.threadId) { openThread(live.dispatch, target, live.state, live.showThreads); return; }
++        const bot = live.state.bots.find((candidate) => candidate.id === target.botId);
++        const task = bot?.tasks?.find((candidate) => candidate.threadId === target.threadId);
++        live.dispatch({ type: "botPatched", bot: { ...bot!, unread: true,
++          tasks: (bot!.tasks ?? []).map((candidate) => candidate.threadId === target.threadId ? { ...candidate, unread: true } : candidate) } });
++        live.dispatch({ type: "notice", notice: { kind: "note", botName: null, text: t("chat.briefWaiting", { title: task?.title ?? bot?.name ?? "" }) } });
+       }, () => {});
+     };
+     const onActivity = () => ping();
+diff --git a/src/locales/en.json b/src/locales/en.json
+index 00bb36522..957503b34 100644
+--- a/src/locales/en.json
++++ b/src/locales/en.json
+@@ -2744,6 +2744,7 @@
+   "chat.handoffDoneWhen": "Done when: {criteria}",
+   "chat.openThread": "Open #{title}",
+   "chat.openFork": "Open fork: {title}",
++  "chat.briefWaiting": "Your brief is ready in #{title}.",
+   "chat.openThreadOn": "Open #{title} on {name}",
+   "chat.sentDirectly": "Sent to {name} directly: it isn't in this room.",
+   "chat.sentDirectlyNotInRoom": "Sent to {name} directly: it isn't in {room}.",
+diff --git a/src/locales/es.json b/src/locales/es.json
+index c4dcc393b..e7138b421 100644
+--- a/src/locales/es.json
++++ b/src/locales/es.json
+@@ -1961,6 +1961,7 @@
+   "chat.openConversationWith": "Abrir la conversación con {name}",
+   "chat.handoffDoneWhen": "Terminado cuando: {criteria}",
+   "chat.openThread": "Abrir #{title}",
++  "chat.briefWaiting": "Tu resumen del día está en #{title}.",
+   "chat.openThreadOn": "Abrir #{title} en {name}",
+   "chat.sentDirectly": "Enviado directamente a {name}: no está en este grupo.",
+   "chat.sentDirectlyNotInRoom": "Enviado directamente a {name}: no está en {room}.",
+diff --git a/src/state/snapshot-navigation.test.ts b/src/state/snapshot-navigation.test.ts
+index 7328128db..c3ce71223 100644
+--- a/src/state/snapshot-navigation.test.ts
++++ b/src/state/snapshot-navigation.test.ts
+@@ -175,12 +175,21 @@ describe("navigation while a reconnect snapshot is in flight", () => {
+     expect(sends[0]).toMatchObject({ threadId: "room-b", text: "Next" });
+   });
+ 
+-  it("accepts the server's thread when navigation did not change", async () => {
++  it("keeps the chat being read when a reconnect names another thread, and marks that one unread", async () => {
++    // The server moves its active thread on its own (a routine opening one, a deleted thread handing over). A reconnect
++    // is not a click, so the transcript on screen stays and the other thread waits with its mark.
+     await resync();
+     await applySnapshot("b");
++    expect(shown().threadId).toBe("a");
++    expect(shown().messages.map(message => message.id)).toEqual(["a"]);
++    expect(shown().tasks?.find(task => task.threadId === "b")?.unread).toBe(true);
++  });
++
++  it("still accepts the server's thread when the one on screen is gone", async () => {
++    await resync();
++    await applySnapshot("b", ["b"]);
+     expect(shown().threadId).toBe("b");
+     expect(shown().messages.map(message => message.id)).toEqual(["snapshot"]);
+-    expect(state.groups[0]?.threadId).toBe("room-b");
+   });
+ 
+   it("refreshes an unchanged conversation while another owner switches threads", async () => {
+diff --git a/src/state/store.test.ts b/src/state/store.test.ts
+index db7729e40..5ca19b71b 100644
+--- a/src/state/store.test.ts
++++ b/src/state/store.test.ts
+@@ -230,6 +230,28 @@ describe("independent bot threads", () => {
+     expect(read.bots[0]?.tasks?.[1]?.unread).toBe(true);
+   });
+ 
++  it("a reconnect keeps the chat being read when the server moved its active thread on its own", () => {
++    // The server's active thread moved (a routine opening its own thread); the one on screen still exists.
++    const snapshot = { ...bot, threadId: "second", messages: [], activeLeafId: null };
++    const state = reducer(start(), { type: "hydrate", bots: [snapshot], groups: [], computerControl: {} });
++    expect(state.bots[0]?.threadId).toBe("first");
++    expect(state.bots[0]?.messages).toEqual(bot.messages);
++    expect(state.bots[0]?.tasks?.[1]?.unread).toBe(true);
++  });
++
++  it("a reconnect follows the server when the thread on screen is gone", () => {
++    const snapshot = { ...bot, threadId: "second", messages: [], activeLeafId: null, tasks: bot.tasks!.slice(1) };
++    const state = reducer(start(), { type: "hydrate", bots: [snapshot], groups: [], computerControl: {} });
++    expect(state.bots[0]?.threadId).toBe("second");
++  });
++
++  it("a reconnect keeps a switch the person made while the snapshot was loading", () => {
++    const switched = reducer(start(), { type: "switchTask", botId: bot.id, threadId: "second" });
++    const snapshot = { ...bot, threadId: "second", messages: [], activeLeafId: null };
++    const state = reducer(switched, { type: "hydrate", bots: [snapshot], groups: [], computerControl: {}, preserveNavigation: true, navigationSince: {} });
++    expect(state.bots[0]).toMatchObject({ threadId: "first", switchingTo: "second" });
++  });
++
+   it("drops deleted-thread approvals before a slim deletion frame is followed by its transcript", () => {
+     const approval: Message = { id: "old-approval", role: "bot", kind: "options", at: 2,
+       card: { title: "Enable skill?", subtitle: "Review this skill", options: ["Enable", "Deny"],
+@@ -1811,6 +1833,7 @@ describe("pending queued chip", () => {
+     color: "green",
+     unread: false,
+     modelSelection: { instanceId: "acp", model: "fake" },
++    tasks: [{ threadId: "t1", title: "One", createdAt: 1 }, { threadId: "t2", title: "Two", createdAt: 2 }],
+   } satisfies Omit<Bot, "messages">;
+ 
+   it("records queue-fallback text and drops it when that user line lands", () => {
+@@ -1883,10 +1906,12 @@ describe("pending queued chip", () => {
+       queueId: "q-stay",
+       text: "stay here",
+     });
++    // The thread on screen was deleted, so the server hands the bot to the next one: a real move, not a stray frame.
+     const switched = reducer(queued, {
+       type: "botPatched",
+-      bot: { ...bot, threadId: "t2", messages: [] },
++      bot: { ...bot, threadId: "t2", messages: [], tasks: [{ threadId: "t2", title: "Two", createdAt: 2 }] },
+     });
++    expect(switched.bots[0]?.threadId).toBe("t2");
+     expect(switched.pendingQueued).toEqual({ t1: [{ queueId: "q-stay", text: "stay here" }] });
+     expect(switched.pendingQueued[switched.bots[0]!.threadId]).toBeUndefined();
+     const drained = reducer(switched, {
+diff --git a/src/state/store.tsx b/src/state/store.tsx
+index 721c3daec..02fa42932 100644
+--- a/src/state/store.tsx
++++ b/src/state/store.tsx
+@@ -21,6 +21,7 @@ import { optimisticMessageId, optimisticUserMessage, sendArrived, sendReconciled
+ import { patchedGroups, roomAnswers, snapshotPatch } from "./room-frames";
+ import { savedStateAction, type SavedOwner, type SavedSnapshot } from "./saved-state";
+ import { keepBotNavigation, keepGroupNavigation, navigatedSince, visibleMessages } from "./snapshot-navigation";
++import { serverMovedThread, threadStillKnown } from "./thread-move";
+ export { visibleMessages } from "./snapshot-navigation";
+ export { awayFromMainThread, botOpensTo, markedThread, openBot, openBotRow, openBotThread, openRoomThread, openThread, visibleNotificationThread, type ThreadTarget } from "./thread-navigation";
+ import type { TurnDigest } from "../../shared/digest";
+@@ -879,15 +880,22 @@ export function reducer(state: AppState, action: Action): AppState {
+         bots: action.bots.map((sent) => {
+           const bot = sent.messages ? sent : { ...sent, messages: [] };
+           const previous = state.bots.find((candidate) => candidate.id === bot.id);
+-          return keepBotNavigation(previous, previous ? { ...bot, tasks: mergeTaskStamps(previous.tasks, bot.tasks) } : bot,
+-            action.preserveNavigation === true && navigatedSince(previous, action.navigationSince, state.transcriptGeneration), action.taskIdsAtStart);
++          const merged = previous ? { ...bot, tasks: mergeTaskStamps(previous.tasks, bot.tasks) } : bot;
++          // A reconnect or a refresh is not a click: the server moving its active thread (a routine opening one) must
++          // not take the chat the person is reading. Their own switch, and a thread that is gone, still land.
++          const kept = previous !== undefined && serverMovedThread(previous, merged);
++          return keepBotNavigation(previous, kept ? { ...merged, unread: true, tasks: (merged.tasks ?? []).map((task) => task.threadId === merged.threadId ? { ...task, unread: true } : task) } : merged,
++            (action.preserveNavigation === true && navigatedSince(previous, action.navigationSince, state.transcriptGeneration)) || kept,
++            action.taskIdsAtStart);
+         }),
+         groups: action.groups.map((group) => {
+           const previous = state.groups.find((candidate) => candidate.id === group.id);
+           const merged = previous ? { ...group, tasks: mergeTaskStamps(previous.tasks, group.tasks) } : group;
+           // The wire carries an explicitly-cleared description as null; client state keeps it absent.
+           if (merged.description === null) merged.description = undefined;
+-          return keepGroupNavigation(previous, merged, action.preserveNavigation === true && navigatedSince(previous, action.navigationSince, state.transcriptGeneration), action.taskIdsAtStart);
++          return keepGroupNavigation(previous, merged,
++            (action.preserveNavigation === true && navigatedSince(previous, action.navigationSince, state.transcriptGeneration))
++              || serverMovedThread(previous, merged), action.taskIdsAtStart);
+         }),
+         sections: action.sections ?? [],
+         computerControl: action.computerControl,
+@@ -1130,9 +1138,14 @@ export function reducer(state: AppState, action: Action): AppState {
+       const animated = action.bot.busy === false && before?.busy && motioned.computerStarts[action.bot.id]
+         ? reducer(motioned, { type: "computerStart", botId: action.bot.id, start: null }) : motioned;
+       const next = action.bot.chiefOfStaff ? { ...animated, bots: withOneChief(animated.bots, action.bot) } : animated;
++      // A frame may name another active thread because the person asked for it (`switchingTo`) or because the thread on
++      // screen is gone. A routine opening its own thread moves the server's active thread too, and that must not take the
++      // chat being read: the other thread is marked unread instead, so it is there when the person looks.
++      const movedByServer =
++        typeof action.bot.threadId === "string" && action.bot.threadId !== before.threadId
++        && before.switchingTo !== action.bot.threadId && threadStillKnown(before, action.bot);
+       const switchedThread =
+-        typeof action.bot.threadId === "string" && action.bot.threadId !== before.threadId &&
+-        !action.bot.tasks?.some((task) => task.threadId === before.threadId);
++        typeof action.bot.threadId === "string" && action.bot.threadId !== before.threadId && !movedByServer;
+       let switching = next;
+       if (switchedThread) {
+         const { [action.bot.threadId]: _stale, ...otherThreadEvents } = next.backgroundThreadEvents;
+@@ -1160,6 +1173,14 @@ export function reducer(state: AppState, action: Action): AppState {
+         messages: switchedThread ? [] : b.messages,
+         hasMore: switchedThread ? undefined : b.hasMore,
+       }));
++      if (movedByServer) {
++        const away = typeof action.bot.threadId === "string" ? action.bot.threadId : undefined;
++        return reconcileModelVariantSessions(updateBot(patched, action.bot.id, (b) => ({
++          ...b,
++          unread: true,
++          tasks: away ? (b.tasks ?? []).map((task) => task.threadId === away ? { ...task, unread: true } : task) : b.tasks,
++        })));
++      }
+       const demoted = Boolean(before.defaultBot) && !action.bot.defaultBot;
+       return reconcileModelVariantSessions(demoted ? { ...patched, notice: { kind: "note" as const, botName: null, text: t("defaultBot.demoted", { name: action.bot.name }) } } : patched);
+     }
+diff --git a/src/state/thread-move.test.ts b/src/state/thread-move.test.ts
+new file mode 100644
+index 000000000..7fb3c7c18
+--- /dev/null
++++ b/src/state/thread-move.test.ts
+@@ -0,0 +1,31 @@
++import { describe, expect, it } from "vitest";
++import { serverMovedThread, threadStillKnown } from "./thread-move";
++
++const owner = (threadId: string, tasks: string[], switchingTo?: string) => ({
++  threadId, switchingTo, tasks: tasks.map((id) => ({ threadId: id })),
++});
++
++describe("the server moving a bot's active thread", () => {
++  it("knows the thread on screen is still one of the bot's threads", () => {
++    expect(threadStillKnown(owner("a", ["a", "b"]), owner("b", ["a", "b"]))).toBe(true);
++    expect(threadStillKnown(owner("a", ["a", "b"]), owner("b", ["b"]))).toBe(false);
++    expect(threadStillKnown(owner("a", ["a"]), owner("a", ["a"]))).toBe(true);
++    expect(threadStillKnown(undefined, owner("b", ["b"]))).toBe(false);
++  });
++
++  it("is a move nobody on this client asked for", () => {
++    expect(serverMovedThread(owner("a", ["a", "b"]), owner("b", ["a", "b"]))).toBe(true);
++    expect(serverMovedThread(owner("a", ["a", "b"]), owner("a", ["a", "b"]))).toBe(false);
++    expect(serverMovedThread(owner("a", ["a", "b"]), owner("b", ["b"]))).toBe(false);
++  });
++
++  it("is the person's own switch when the client is waiting for that thread", () => {
++    expect(serverMovedThread(owner("a", ["a", "b"], "b"), owner("b", ["a", "b"]))).toBe(false);
++  });
++
++  it("keeps the thread when a partial frame does not list it", () => {
++    // A frame that carries one thread alone says nothing about the others, so it cannot prove one is gone.
++    expect(threadStillKnown(owner("a", ["a"]), { threadId: "b" })).toBe(true);
++    expect(serverMovedThread(owner("a", ["a"]), { threadId: "b" })).toBe(true);
++  });
++});
+diff --git a/src/state/thread-move.ts b/src/state/thread-move.ts
+new file mode 100644
+index 000000000..fd92d8328
+--- /dev/null
++++ b/src/state/thread-move.ts
+@@ -0,0 +1,25 @@
++// A bot's active thread lives on the server (`bot.threadId`), and the server moves it on its own: a routine's run
++// opening its own thread, a deleted thread handing over to the next one. The chat on screen never follows that by
++// itself; these decide when a snapshot may replace the thread the person is reading.
++
++interface Owner {
++  threadId: string;
++  switchingTo?: string;
++  tasks?: ReadonlyArray<{ threadId: string }>;
++}
++
++/** Whether the thread the person has open is still one of the owner's threads in the frame. */
++export function threadStillKnown(known: Owner | undefined, incoming: Owner): boolean {
++  if (!known?.threadId) return false;
++  if (known.threadId === incoming.threadId) return true;
++  if (!incoming.tasks) return true;
++  return incoming.tasks.some((task) => task.threadId === known.threadId);
++}
++
++/** A snapshot moves the owner to another thread while the one on screen still exists: the person asked for the switch
++ * (`switchingTo`) or it is not their turn to be moved. */
++export function serverMovedThread(known: Owner | undefined, incoming: Owner): boolean {
++  if (!known || !incoming.threadId || incoming.threadId === known.threadId) return false;
++  if (known.switchingTo === incoming.threadId) return false;
++  return threadStillKnown(known, incoming);
++}
