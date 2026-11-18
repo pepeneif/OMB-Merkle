@@ -1,3 +1,6 @@
+> **Versión propia de Merkle.Space** — fork de trabajo sobre **OpenMausBot v0.1.169**.
+> Repo: `pepeneif/OMB-Propio-Merkle` · Bitácora de parches: [`README-MERKLE.md`](README-MERKLE.md).
+
 <div align="center">
 
 # OpenMausBot
