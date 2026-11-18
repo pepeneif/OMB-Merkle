@@ -5,7 +5,7 @@ import { ArrowDown, ArrowUp, Check, Copy, Download, Maximize2, Search, WrapText,
 import { isTableAmount, tableCsv, tableRowOrder, type TableSort } from "@/lib/table-data";
 import { intlLocale, t } from "@/lib/i18n";
 import { copyText } from "@/lib/copy-text";
-import { columnMinimums, fitsColumns } from "@/lib/table-fit";
+import { CHAR_PX, columnMinimums, fitsColumns } from "@/lib/table-fit";
 import { cn } from "@/lib/cn";
 import { useAdvancedMode } from "@/lib/interface-mode";
 
@@ -21,6 +21,8 @@ export interface RichTableProps {
   headless?: boolean;
   /** Simple mode draws a reply's table as a card; a table inside a card of its own (a widget) opts out. */
   card?: boolean;
+  /** A small table of figures reads best with every column the same width: markdown tables ask for it. */
+  equal?: boolean;
 }
 
 /** The native modal supplies focus containment, Escape, an inert background and focus restoration. */
@@ -52,7 +54,7 @@ const SMALL_TABLE_ROWS = 8;
  * always shown and its buttons keep 40px targets, give it a band of its own. */
 const TABLE_CARD = "group/table relative w-fit min-w-[min(100%,20rem)] max-w-full overflow-hidden rounded-[18px] bg-card text-ink touch:pt-11";
 
-export function RichTable({ columns, rows, name = t("table.title"), expanded = false, direction = "ltr", headless = false, card: asCard = true }: RichTableProps) {
+export function RichTable({ columns, rows, name = t("table.title"), expanded = false, direction = "ltr", headless = false, card: asCard = true, equal = false }: RichTableProps) {
   const simple = !useAdvancedMode();
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
@@ -103,7 +105,7 @@ export function RichTable({ columns, rows, name = t("table.title"), expanded = f
           <span role="status" className="shrink-0 text-[12px] tabular-nums">{t("table.count", { shown: order.length.toLocaleString(), total: rows.length.toLocaleString(), columns: columns.length })}</span>
         </div>
       )}
-      <TableViewport columns={columns} rows={rows} order={order} name={name} wrap={wrap} large={false} sort={sort} direction={direction} headless={headless} look="card" onSort={sortBy} />
+      <TableViewport columns={columns} rows={rows} order={order} name={name} wrap={wrap} large={false} sort={sort} direction={direction} headless={headless} look="card" onSort={sortBy} equal={equal} />
       {status}
     </div>
   );
@@ -123,7 +125,7 @@ export function RichTable({ columns, rows, name = t("table.title"), expanded = f
         {actions}
       </div>}
       <TableViewport columns={columns} rows={rows} order={order} name={name} wrap={wrap} large={large} sort={sort} direction={direction} headless={headless}
-        look={simple ? "quiet" : "panel"} onSort={sortBy} />
+        look={simple ? "quiet" : "panel"} onSort={sortBy} equal={equal} />
       <footer className={small
         ? "flex items-center justify-end gap-0.5 border-t border-hairline/30 px-1.5 py-1 text-[11px] text-ink-tertiary"
         : "flex flex-wrap items-center justify-between gap-2 border-t border-hairline/40 px-3 py-2 text-[11px] text-ink-secondary"}>
@@ -141,7 +143,15 @@ export function RichTable({ columns, rows, name = t("table.title"), expanded = f
  * card in a Simple reply: header names are the sort buttons, rows are split by hairlines, and nothing else is drawn. */
 type TableLook = "panel" | "quiet" | "card";
 
-function TableViewport({ columns, rows, order, name, wrap, large, sort, onSort, direction, headless = false, look = "panel" }: RichTableProps & {
+/** A table of equal columns still gives each one room for a heading and a short figure. */
+const EQUAL_COLUMN_MIN = 96;
+
+/** A numeric column keeps one width whatever its values, so columns of numbers line up across a table. */
+const NUMBER_COLUMN_MIN = 104;
+const NUMBER_COLUMN_MAX = 220;
+const NUMBER_COLUMN_PADDING = 36;
+
+function TableViewport({ columns, rows, order, name, wrap, large, sort, onSort, direction, headless = false, look = "panel", equal = false }: RichTableProps & {
   order: number[]; wrap: boolean; large: boolean; sort: TableSort; onSort: (column: number) => void; look?: TableLook;
 }) {
   const card = look === "card";
@@ -164,14 +174,32 @@ function TableViewport({ columns, rows, order, name, wrap, large, sort, onSort, 
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
-  const fit = fitsColumns({ wrap, virtual, minimums, available });
-  const widths = useMemo(() => columns.map((column, index) => column.width ?? Math.min(320, Math.max(140,
-    Math.max(column.text.length, ...rows.slice(0, 100).map((row) => Math.min(40, row[index]?.text.length ?? 0))) * 7 + 40,
-  ))), [columns, rows]);
+  const fitted = fitsColumns({ wrap, virtual, minimums, available });
+  /** Equal columns need the fixed layout, so a table that asks for them never fits its columns to the message. */
+  const fit = fitted && !equal;
   const numeric = useMemo(() => columns.map((_, index) => {
     const nonempty = rows.slice(0, 200).map((row) => row[index]?.text.trim() ?? "").filter(Boolean);
     return nonempty.length > 0 && nonempty.every(isTableAmount);
   }), [columns, rows]);
+  /** Every numeric column in a table gets the same width, taken from its longest value, so the digits of one column
+   * sit directly under the next and the header lines up with them. */
+  const numberWidth = useMemo(() => {
+    let longest = 0;
+    columns.forEach((column, index) => {
+      if (!numeric[index]) return;
+      longest = Math.max(longest, column.text.length, ...rows.slice(0, 200).map((row) => row[index]?.text.trim().length ?? 0));
+    });
+    return Math.round(Math.min(NUMBER_COLUMN_MAX, Math.max(NUMBER_COLUMN_MIN, longest * CHAR_PX + NUMBER_COLUMN_PADDING)));
+  }, [columns, rows, numeric]);
+  const widths = useMemo(() => {
+    const natural = columns.map((column, index) => column.width ?? (numeric[index] ? numberWidth : Math.min(320, Math.max(140,
+      Math.max(column.text.length, ...rows.slice(0, 100).map((row) => Math.min(40, row[index]?.text.length ?? 0))) * 7 + 40,
+    ))));
+    if (!equal) return natural;
+    const room = available === null ? Infinity : Math.floor(available / Math.max(1, columns.length));
+    const widest = Math.min(room, Math.max(...natural.map((width) => width ?? 0)));
+    return columns.map(() => Math.max(EQUAL_COLUMN_MIN, widest));
+  }, [columns, rows, numeric, numberWidth, equal, available]);
   const virtualizer = useVirtualizer({ count: order.length, getScrollElement: () => scroll.current, estimateSize: () => 42,
     getItemKey: (index) => order[index]!, overscan: 6, enabled: virtual, initialRect: { width: 800, height: 400 }, scrollMargin: headingHeight });
   useEffect(() => { if (scroll.current) scroll.current.scrollTop = 0; }, [order]);
@@ -183,7 +211,7 @@ function TableViewport({ columns, rows, order, name, wrap, large, sort, onSort, 
   const sortLabel = (column: TableColumn, index: number) => t("table.sort", { column: column.text || index + 1 });
   const header = (column: TableColumn, index: number) => column.content ?? (column.text || t("table.column", { number: index + 1 }));
   const arrow = (index: number, className?: string) => sort?.column === index && sort.descending ? <ArrowDown size={12} className={className} /> : <ArrowUp size={12} className={cn(className, sort?.column !== index && !card && "opacity-35")} />;
-  const cardArrow = (index: number) => arrow(index, cn("shrink-0 text-ink-tertiary transition-opacity", sort?.column === index ? "opacity-100" : "opacity-0 group-hover/th:opacity-100 group-focus-within/th:opacity-100 touch:opacity-100"));
+  const cardArrow = (index: number) => arrow(index, cn("shrink-0 text-ink-tertiary transition-opacity", sort?.column === index ? "opacity-100" : "opacity-60 group-hover/th:opacity-100 group-focus-within/th:opacity-100"));
   return <div ref={scroll} tabIndex={0} role="region" aria-label={name}
     className={cn("overflow-auto overscroll-x-contain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/60", card && !fit && "[mask-image:linear-gradient(90deg,#000_calc(100%-40px),transparent)]")}
     style={{ maxHeight: large ? "65dvh" : virtual || !wrap ? 400 : undefined }} data-fit={fit || undefined}>
@@ -191,14 +219,19 @@ function TableViewport({ columns, rows, order, name, wrap, large, sort, onSort, 
       {!fit && <colgroup>{widths.map((width, index) => <col key={index} style={{ width }} />)}</colgroup>}
       <thead ref={heading} hidden={headless} className={cn("sticky top-0 z-10", look === "panel" ? "bg-raised" : look === "card" ? "bg-card" : "bg-composer")}><tr aria-rowindex={1}>
         {columns.map((column, index) => <th key={index} scope="col" aria-sort={sort?.column === index ? sort.descending ? "descending" : "ascending" : "none"}
-          className={card ? "px-4 py-2.5 align-bottom font-semibold" : "h-10 border-b border-hairline/60 px-3 py-2 font-medium"} style={{ textAlign: alignment(column, index) }}>
-          <div className="break-words [overflow-wrap:anywhere]" style={fit ? { minWidth: minimums[index] } : undefined}>
+          className={card ? "px-4 py-2.5 align-bottom font-semibold" : "h-10 border-b border-hairline/60 px-3 py-2 font-medium"} style={{ textAlign: alignment(column, index), ...(fit && numeric[index] ? { width: numberWidth } : undefined) }}>
+          <div className="break-words [overflow-wrap:anywhere]" style={fit ? { minWidth: numeric[index] ? numberWidth : minimums[index] } : undefined}>
             {card ? (
-              <button type="button" className="group/th inline-flex max-w-full items-center gap-1 align-top text-start font-semibold [text-align:inherit] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60" aria-label={sortLabel(column, index)} title={sortLabel(column, index)} onClick={() => onSort(index)}>
+              <button type="button" className={cn("group/th inline-flex max-w-full items-center gap-1 align-top font-semibold [text-align:inherit] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60", alignment(column, index) === "right" ? "justify-end text-end" : "justify-start text-start")} aria-label={sortLabel(column, index)} title={sortLabel(column, index)} onClick={() => onSort(index)}>
                 {alignment(column, index) === "right" && cardArrow(index)}
                 <span dir="auto">{header(column, index)}</span>
                 {alignment(column, index) !== "right" && cardArrow(index)}
               </button>
+            ) : numeric[index] ? (
+              <span className="inline-flex max-w-full items-center justify-end gap-1 align-middle">
+                <button type="button" className="table-action inline-flex" aria-label={sortLabel(column, index)} title={sortLabel(column, index)} onClick={() => onSort(index)}>{arrow(index)}</button>
+                <span dir="auto">{header(column, index)}</span>
+              </span>
             ) : <>
               <span dir="auto">{header(column, index)}</span>
               <button type="button" className="table-action ms-1 inline-flex align-middle" aria-label={sortLabel(column, index)} title={sortLabel(column, index)} onClick={() => onSort(index)}>{arrow(index)}</button>

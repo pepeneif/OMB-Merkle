@@ -1,6 +1,7 @@
 import type { ModelCatalog, ModelSelection } from "./contracts.ts";
 import { isConversational, type ReplyStyle } from "../shared/reply-style.ts";
 import type { EffortLevel } from "../shared/wire.ts";
+import { isImageModel } from "./model-kinds.ts";
 
 export type TurnTier = "simple" | "complex";
 
@@ -39,10 +40,11 @@ const FAST = /(^|[-_/. ])(haiku|flash|mini|nano|lite|small|fast|instant|spark|tu
 /** Same upstream provider only; among several, the first listed wins since engines list their newest first. */
 export function fastModelFor(catalog: ModelCatalog | undefined, current: string, refused: ReadonlySet<string> = new Set()): string | undefined {
   if (!catalog) return undefined;
-  if (FAST.test(current)) return current;
+  if (FAST.test(current) && !isImageModel(current)) return current;
   const provider = catalog.options.find((option) => option.id === current)?.provider;
   const pick = catalog.options.find((option) => !option.custom && !refused.has(option.id) &&
-    FAST.test(option.id) && (option.provider ?? undefined) === (provider ?? undefined));
+    FAST.test(option.id) && !isImageModel(`${option.id} ${option.label}`) &&
+    (option.provider ?? undefined) === (provider ?? undefined));
   return pick?.id;
 }
 

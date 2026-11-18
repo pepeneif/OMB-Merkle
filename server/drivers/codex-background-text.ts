@@ -10,6 +10,7 @@ import { join } from "node:path";
 import type { ModelCatalog, SmallModelFallback, TextGenerationOptions, TextGenerationUsage } from "../contracts.ts";
 import type { killCliTree, spawnCli } from "../procs.ts";
 import { refusesModel } from "../quick-model-fallback.ts";
+import { isImageModel } from "../model-kinds.ts";
 import { decodeCodexSelection, OFFICIAL_CODEX_PROVIDER } from "./codex-catalog.ts";
 import { codexConfigProviderArgs } from "./codex-config-provider.ts";
 import { codexToolSurfaceArgs } from "./codex-tool-surface.ts";
@@ -32,12 +33,24 @@ export function codexBackgroundModel(catalog: ModelCatalog, refused: ReadonlySet
   const listed = catalog.options.filter((option) => !(official && option.custom) && !refused.has(option.id) &&
     decodeCodexSelection(option.id).modelProvider === provider);
   if (official) for (const id of CODEX_BACKGROUND_MODELS) if (listed.some((option) => option.id === id)) return id;
-  const small = listed.find((option) => SMALL_MODEL.test(decodeCodexSelection(option.id).model ?? option.id))?.id;
+  const small = listed.find((option) => {
+    const model = decodeCodexSelection(option.id).model ?? option.id;
+    return SMALL_MODEL.test(model) && !isImageModel(`${model} ${option.label}`);
+  })?.id;
   return small ?? (official ? accountDefault(catalog) : null);
 }
 
 function accountDefault(catalog: ModelCatalog): string | null {
   return catalog.default || catalog.options.find((option) => !option.custom)?.id || catalog.options[0]?.id || null;
+}
+
+/** An explicitly pinned background model (`OMB_BACKGROUND_MODEL`), used as-is when the catalog lists it. */
+export function pinnedBackgroundModel(catalog: ModelCatalog, pin: string | undefined, provider: string): string | null {
+  const wanted = pin?.trim();
+  if (!wanted) return null;
+  const option = catalog.options.find((candidate) => candidate.id === wanted || candidate.id === `openrouter::${wanted}`);
+  if (!option) return null;
+  return decodeCodexSelection(option.id).modelProvider === provider ? option.id : null;
 }
 
 export interface CodexBackgroundRoute {
@@ -53,7 +66,8 @@ export function codexBackgroundRoute(catalog: ModelCatalog, smallModelsUsable: b
   const own = fallback?.model || accountDefault(catalog);
   const provider = own ? providerOf(own) : OFFICIAL_CODEX_PROVIDER;
   const small = smallModelsUsable && !(openaiUnreachable && provider === OFFICIAL_CODEX_PROVIDER);
-  const model = (small ? codexBackgroundModel(catalog, fallback?.refused, provider) : null) ?? own;
+  const pinned = pinnedBackgroundModel(catalog, process.env.OMB_BACKGROUND_MODEL, provider);
+  const model = pinned ?? (small ? codexBackgroundModel(catalog, fallback?.refused, provider) : null) ?? own;
   if (!model) return null;
   return own && own !== model ? { model, retry: own } : { model };
 }
