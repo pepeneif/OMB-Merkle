@@ -90,15 +90,16 @@ describe("sidebar footer places", () => {
     expect(render("comfortable").html).toMatch(/data-sidebar-nav="automations"[^>]*aria-current="page"/);
   });
 
-  it("opens the Triggers page (triggers scope) through the store and marks it current while open", () => {
+  it("opens the Triggers page (triggers scope) through the store, and lights it only while it is the scope", () => {
     fixture.advanced = true;
     const { nodes: tree } = render("comfortable");
-    const row = tree.find((node) => node.props.id === "triggers" && typeof node.props.onClick === "function")!;
-    (row.props.onClick as () => void)();
+    (tree.find((node) => node.props.id === "triggers" && typeof node.props.onClick === "function")!.props.onClick as () => void)();
     expect(fixture.dispatch).toHaveBeenLastCalledWith({ type: "showRoutines", view: "list", scope: "triggers" });
     fixture.state.activeView = "routines";
     fixture.state.routinesFocus = { scope: "triggers", nonce: 0 };
-    expect(render("comfortable").html).toMatch(/data-sidebar-nav="triggers"[^>]*aria-current="page"/);
+    const html = render("comfortable").html;
+    expect(html).toMatch(/data-sidebar-nav="triggers"[^>]*aria-current="page"/);
+    expect(html).not.toMatch(/data-sidebar-nav="automations"[^>]*aria-current="page"/);
   });
 
   it("adds a row per pinned web panel after Team map, in Advanced mode only", () => {
@@ -275,8 +276,6 @@ describe("toolbar tools layout", () => {
     expect(html).toContain('data-tour="tools"');
     expect(html).toMatch(/data-tour="nav-automations" data-sidebar-nav="automations"/);
     expect(html).toMatch(/data-tour="team-tools" data-sidebar-nav="team-map"/);
-    expect(html).toContain('data-sidebar-nav="published-apps"');
-    expect(html.indexOf('data-sidebar-nav="published-apps"')).toBeGreaterThan(html.indexOf('data-sidebar-nav="team-map"'));
     const place = (id: string) => {
       const at = html.indexOf(`data-sidebar-nav="${id}"`);
       const next = html.indexOf("data-sidebar-nav=", at + 1);

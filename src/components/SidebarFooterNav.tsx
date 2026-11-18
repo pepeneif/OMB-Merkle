@@ -1,4 +1,4 @@
-import { AppWindow, FolderOpen, FolderTree, Globe, Puzzle, Rocket, UsersRound, Zap } from "lucide-react";
+import { AppWindow, CalendarDays, FolderOpen, FolderTree, Globe, Network, Puzzle, Zap } from "lucide-react";
 import { useMemo, type ReactNode } from "react";
 
 import { useAppTriggers } from "@/lib/app-triggers";
@@ -47,7 +47,7 @@ function NavRow({
       aria-current={active ? "page" : undefined}
       className={cn(
         "relative flex items-center rounded-xl transition-colors",
-        rail ? "size-9 shrink-0 justify-center" : iconsOnly ? "mx-auto size-[46px] shrink-0 justify-center" : "w-full min-h-9 gap-3 px-3 py-1.5 text-left",
+        rail ? "size-9 shrink-0 justify-center" : iconsOnly ? "mx-auto size-8 shrink-0 justify-center" : "w-full min-h-9 gap-3 px-3 py-1.5 text-left",
         active ? "bg-raised text-ink" : "text-ink hover:bg-raised/50",
       )}
     >
@@ -130,10 +130,20 @@ export function SidebarFooterNav({
     label={t("sidebar.nav.automations")}
     tourId="nav-automations"
     iconsOnly={iconsOnly || toolbar}
-    active={state.activeView === "routines"}
+    active={state.activeView === "routines" && state.routinesFocus?.scope !== "triggers"}
     attention={automationsNeedYou}
+    icon={(active) => <CalendarDays size={iconSize} className={tone(active)} />}
+    onClick={() => dispatch({ type: "showRoutines", view: "list", scope: "schedules" })}
+  />;
+  const triggersRow = <NavRow
+    id="triggers"
+    label={t("sidebar.nav.triggers")}
+    tourId="nav-triggers"
+    iconsOnly={iconsOnly || toolbar}
+    rail={rail}
+    active={state.activeView === "routines" && state.routinesFocus?.scope === "triggers"}
     icon={(active) => <Zap size={iconSize} className={tone(active)} />}
-    onClick={() => dispatch({ type: "showRoutines", view: "list" })}
+    onClick={() => dispatch({ type: "showRoutines", view: "list", scope: "triggers" })}
   />;
   const filesRow = useCloudFilesReady() && <NavRow
     id="files"
@@ -160,6 +170,7 @@ export function SidebarFooterNav({
   const rows = (
     <>
       {automationsRow}
+      {triggersRow}
       {appsRow}
       {(advanced || iconsOnly) && (
         <NavRow
@@ -168,19 +179,11 @@ export function SidebarFooterNav({
           tourId="team-tools"
           iconsOnly={iconsOnly || toolbar}
           active={state.activeView === "team-map"}
-          icon={(active) => <UsersRound size={iconSize} className={tone(active)} />}
+          icon={(active) => <Network size={iconSize} className={tone(active)} />}
           onClick={() => dispatch({ type: "showTeamMap" })}
         />
       )}
       {filesRow}
-      <NavRow
-        id="published-apps"
-        label={t("sidebar.nav.publishedApps")}
-        iconsOnly={iconsOnly || toolbar}
-        active={state.activeView === "published-apps"}
-        icon={(active) => <Rocket size={iconSize} className={tone(active)} />}
-        onClick={() => dispatch({ type: "showPublishedApps" })}
-      />
       {state.config?.team && (
         <NavRow
           id="team-files"
