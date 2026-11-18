@@ -21,6 +21,7 @@ import { optimisticMessageId, optimisticUserMessage, sendArrived, sendReconciled
 import { patchedGroups, roomAnswers, snapshotPatch } from "./room-frames";
 import { savedStateAction, type SavedOwner, type SavedSnapshot } from "./saved-state";
 import { keepBotNavigation, keepGroupNavigation, navigatedSince, visibleMessages } from "./snapshot-navigation";
+import { serverMovedThread, threadStillKnown } from "./thread-move";
 export { visibleMessages } from "./snapshot-navigation";
 export { awayFromMainThread, botOpensTo, markedThread, openBot, openBotRow, openBotThread, openRoomThread, openThread, visibleNotificationThread, type ThreadTarget } from "./thread-navigation";
 import type { TurnDigest } from "../../shared/digest";
@@ -879,15 +880,22 @@ export function reducer(state: AppState, action: Action): AppState {
         bots: action.bots.map((sent) => {
           const bot = sent.messages ? sent : { ...sent, messages: [] };
           const previous = state.bots.find((candidate) => candidate.id === bot.id);
-          return keepBotNavigation(previous, previous ? { ...bot, tasks: mergeTaskStamps(previous.tasks, bot.tasks) } : bot,
-            action.preserveNavigation === true && navigatedSince(previous, action.navigationSince, state.transcriptGeneration), action.taskIdsAtStart);
+          const merged = previous ? { ...bot, tasks: mergeTaskStamps(previous.tasks, bot.tasks) } : bot;
+          // A reconnect or a refresh is not a click: the server moving its active thread (a routine opening one) must
+          // not take the chat the person is reading. Their own switch, and a thread that is gone, still land.
+          const kept = previous !== undefined && serverMovedThread(previous, merged);
+          return keepBotNavigation(previous, kept ? { ...merged, unread: true, tasks: (merged.tasks ?? []).map((task) => task.threadId === merged.threadId ? { ...task, unread: true } : task) } : merged,
+            (action.preserveNavigation === true && navigatedSince(previous, action.navigationSince, state.transcriptGeneration)) || kept,
+            action.taskIdsAtStart);
         }),
         groups: action.groups.map((group) => {
           const previous = state.groups.find((candidate) => candidate.id === group.id);
           const merged = previous ? { ...group, tasks: mergeTaskStamps(previous.tasks, group.tasks) } : group;
           // The wire carries an explicitly-cleared description as null; client state keeps it absent.
           if (merged.description === null) merged.description = undefined;
-          return keepGroupNavigation(previous, merged, action.preserveNavigation === true && navigatedSince(previous, action.navigationSince, state.transcriptGeneration), action.taskIdsAtStart);
+          return keepGroupNavigation(previous, merged,
+            (action.preserveNavigation === true && navigatedSince(previous, action.navigationSince, state.transcriptGeneration))
+              || serverMovedThread(previous, merged), action.taskIdsAtStart);
         }),
         sections: action.sections ?? [],
         computerControl: action.computerControl,
@@ -1130,9 +1138,14 @@ export function reducer(state: AppState, action: Action): AppState {
       const animated = action.bot.busy === false && before?.busy && motioned.computerStarts[action.bot.id]
         ? reducer(motioned, { type: "computerStart", botId: action.bot.id, start: null }) : motioned;
       const next = action.bot.chiefOfStaff ? { ...animated, bots: withOneChief(animated.bots, action.bot) } : animated;
+      // A frame may name another active thread because the person asked for it (`switchingTo`) or because the thread on
+      // screen is gone. A routine opening its own thread moves the server's active thread too, and that must not take the
+      // chat being read: the other thread is marked unread instead, so it is there when the person looks.
+      const movedByServer =
+        typeof action.bot.threadId === "string" && action.bot.threadId !== before.threadId
+        && before.switchingTo !== action.bot.threadId && threadStillKnown(before, action.bot);
       const switchedThread =
-        typeof action.bot.threadId === "string" && action.bot.threadId !== before.threadId &&
-        !action.bot.tasks?.some((task) => task.threadId === before.threadId);
+        typeof action.bot.threadId === "string" && action.bot.threadId !== before.threadId && !movedByServer;
       let switching = next;
       if (switchedThread) {
         const { [action.bot.threadId]: _stale, ...otherThreadEvents } = next.backgroundThreadEvents;
@@ -1160,6 +1173,14 @@ export function reducer(state: AppState, action: Action): AppState {
         messages: switchedThread ? [] : b.messages,
         hasMore: switchedThread ? undefined : b.hasMore,
       }));
+      if (movedByServer) {
+        const away = typeof action.bot.threadId === "string" ? action.bot.threadId : undefined;
+        return reconcileModelVariantSessions(updateBot(patched, action.bot.id, (b) => ({
+          ...b,
+          unread: true,
+          tasks: away ? (b.tasks ?? []).map((task) => task.threadId === away ? { ...task, unread: true } : task) : b.tasks,
+        })));
+      }
       const demoted = Boolean(before.defaultBot) && !action.bot.defaultBot;
       return reconcileModelVariantSessions(demoted ? { ...patched, notice: { kind: "note" as const, botName: null, text: t("defaultBot.demoted", { name: action.bot.name }) } } : patched);
     }

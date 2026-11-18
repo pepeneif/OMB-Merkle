@@ -205,6 +205,21 @@ describe("usePresence", () => {
     ]);
   });
 
+  it("never takes the screen from a chat being read: the brief waits, marked, with a line saying where", async () => {
+    stubDom();
+    fixture.api.mockResolvedValue(toChief);
+    const dispatch = vi.fn();
+    const reading: AppState = { ...loaded, bots: [{ ...chief, threadId: "chief-2" }], selectedId: "chief" };
+    render(reading, dispatch);
+    await flush();
+    const actions = dispatch.mock.calls.map(([action]) => action as Action);
+    expect(actions.some((action) => action.type === "switchTask")).toBe(false);
+    expect(actions.find((action) => action.type === "notice")).toMatchObject({ notice: { kind: "note" } });
+    expect(actions.find((action) => action.type === "botPatched")).toMatchObject({
+      bot: { tasks: expect.arrayContaining([expect.objectContaining({ threadId: "chief-main", unread: true })]) },
+    });
+  });
+
   it("removes every listener it added when it unmounts", () => {
     const dom = stubDom();
     fixture.api.mockResolvedValue({ ok: true, returned: false });

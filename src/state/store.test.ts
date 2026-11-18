@@ -230,6 +230,28 @@ describe("independent bot threads", () => {
     expect(read.bots[0]?.tasks?.[1]?.unread).toBe(true);
   });
 
+  it("a reconnect keeps the chat being read when the server moved its active thread on its own", () => {
+    // The server's active thread moved (a routine opening its own thread); the one on screen still exists.
+    const snapshot = { ...bot, threadId: "second", messages: [], activeLeafId: null };
+    const state = reducer(start(), { type: "hydrate", bots: [snapshot], groups: [], computerControl: {} });
+    expect(state.bots[0]?.threadId).toBe("first");
+    expect(state.bots[0]?.messages).toEqual(bot.messages);
+    expect(state.bots[0]?.tasks?.[1]?.unread).toBe(true);
+  });
+
+  it("a reconnect follows the server when the thread on screen is gone", () => {
+    const snapshot = { ...bot, threadId: "second", messages: [], activeLeafId: null, tasks: bot.tasks!.slice(1) };
+    const state = reducer(start(), { type: "hydrate", bots: [snapshot], groups: [], computerControl: {} });
+    expect(state.bots[0]?.threadId).toBe("second");
+  });
+
+  it("a reconnect keeps a switch the person made while the snapshot was loading", () => {
+    const switched = reducer(start(), { type: "switchTask", botId: bot.id, threadId: "second" });
+    const snapshot = { ...bot, threadId: "second", messages: [], activeLeafId: null };
+    const state = reducer(switched, { type: "hydrate", bots: [snapshot], groups: [], computerControl: {}, preserveNavigation: true, navigationSince: {} });
+    expect(state.bots[0]).toMatchObject({ threadId: "first", switchingTo: "second" });
+  });
+
   it("drops deleted-thread approvals before a slim deletion frame is followed by its transcript", () => {
     const approval: Message = { id: "old-approval", role: "bot", kind: "options", at: 2,
       card: { title: "Enable skill?", subtitle: "Review this skill", options: ["Enable", "Deny"],
@@ -1811,6 +1833,7 @@ describe("pending queued chip", () => {
     color: "green",
     unread: false,
     modelSelection: { instanceId: "acp", model: "fake" },
+    tasks: [{ threadId: "t1", title: "One", createdAt: 1 }, { threadId: "t2", title: "Two", createdAt: 2 }],
   } satisfies Omit<Bot, "messages">;
 
   it("records queue-fallback text and drops it when that user line lands", () => {
@@ -1883,10 +1906,12 @@ describe("pending queued chip", () => {
       queueId: "q-stay",
       text: "stay here",
     });
+    // The thread on screen was deleted, so the server hands the bot to the next one: a real move, not a stray frame.
     const switched = reducer(queued, {
       type: "botPatched",
-      bot: { ...bot, threadId: "t2", messages: [] },
+      bot: { ...bot, threadId: "t2", messages: [], tasks: [{ threadId: "t2", title: "Two", createdAt: 2 }] },
     });
+    expect(switched.bots[0]?.threadId).toBe("t2");
     expect(switched.pendingQueued).toEqual({ t1: [{ queueId: "q-stay", text: "stay here" }] });
     expect(switched.pendingQueued[switched.bots[0]!.threadId]).toBeUndefined();
     const drained = reducer(switched, {

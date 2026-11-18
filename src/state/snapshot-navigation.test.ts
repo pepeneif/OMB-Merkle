@@ -175,12 +175,21 @@ describe("navigation while a reconnect snapshot is in flight", () => {
     expect(sends[0]).toMatchObject({ threadId: "room-b", text: "Next" });
   });
 
-  it("accepts the server's thread when navigation did not change", async () => {
+  it("keeps the chat being read when a reconnect names another thread, and marks that one unread", async () => {
+    // The server moves its active thread on its own (a routine opening one, a deleted thread handing over). A reconnect
+    // is not a click, so the transcript on screen stays and the other thread waits with its mark.
     await resync();
     await applySnapshot("b");
+    expect(shown().threadId).toBe("a");
+    expect(shown().messages.map(message => message.id)).toEqual(["a"]);
+    expect(shown().tasks?.find(task => task.threadId === "b")?.unread).toBe(true);
+  });
+
+  it("still accepts the server's thread when the one on screen is gone", async () => {
+    await resync();
+    await applySnapshot("b", ["b"]);
     expect(shown().threadId).toBe("b");
     expect(shown().messages.map(message => message.id)).toEqual(["snapshot"]);
-    expect(state.groups[0]?.threadId).toBe("room-b");
   });
 
   it("refreshes an unchanged conversation while another owner switches threads", async () => {

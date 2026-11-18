@@ -6,6 +6,7 @@ import { useShowThreads } from "@/lib/thread-preferences";
 import { useStoreRef } from "@/state/store-ref";
 import { t } from "@/lib/i18n";
 import { parseBotRefUrl, parseThreadRefUrl, resolveThreadRefAddress, splitThreadRefsForDisplay, type ThreadRefCandidate } from "@/lib/thread-refs";
+import { splitBareUrls } from "@/lib/bare-urls";
 
 export interface ThreadRefsValue {
   threads: ThreadRefCandidate[];
@@ -131,13 +132,26 @@ export function ThreadRefText({ text, peers, everyone = false }: {
   const { threads, currentBotId } = useThreadRefs();
   const spans = useMemo(() => splitThreadRefsForDisplay(text, threads, currentBotId), [text, threads, currentBotId]);
   const plain = (run: string, key: number) =>
-    peers ? <MentionText key={key} text={run} peers={peers} everyone={everyone} /> : <Fragment key={key}>{run}</Fragment>;
+    peers ? <MentionText key={key} text={run} peers={peers} everyone={everyone} /> : <LinkedText key={key} text={run} />;
   if (!spans.some((span) => span.ref)) return plain(text, 0);
   return (
     <>
       {spans.map((span, index) => (span.ref
         ? <ThreadLink key={index} target={span.ref} ambiguous={span.ref.ambiguous}>{span.text}</ThreadLink>
         : plain(span.text, index)))}
+    </>
+  );
+}
+
+/** Someone's own words: a web address typed as-is is drawn as a link and opens in a new window. */
+function LinkedText({ text }: { text: string }) {
+  const runs = useMemo(() => splitBareUrls(text), [text]);
+  if (runs.every((run) => run.href === undefined)) return <>{text}</>;
+  return (
+    <>
+      {runs.map((run, index) => run.href
+        ? <a key={index} href={run.href} target="_blank" rel="noopener noreferrer" className="underline decoration-1 underline-offset-2">{run.text}</a>
+        : <Fragment key={index}>{run.text}</Fragment>)}
     </>
   );
 }
