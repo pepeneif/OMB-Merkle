@@ -21,6 +21,18 @@ describe("MCP scope configuration", () => {
     expect(gated!.args.join(" ")).not.toContain("disposable-test-token");
   });
 
+  it("accepts a private registry whose only work is building the directory (buildDirectory)", () => {
+    const name = "OMB_GATE_CONFIG_" + "a".repeat(64);
+    const build = gateServer({ ...input, buildDirectory: true, configEnvName: name });
+    expect(build).not.toBeNull();
+    expect(JSON.parse(build!.env[name]).OMB_GATE_DIRECTORY).toBe("build");
+  });
+
+  it("still rejects a private registry whose work the guard does not know", () => {
+    expect(() => gateServer({ ...input, schemaProfile: "compact", configEnvName: "OMB_GATE_CONFIG_" + "b".repeat(64) }))
+      .toThrow(/Invalid private MCP gate configuration/);
+  });
+
   it("rejects malformed scopes and unmountable scoped servers instead of returning a bypass", () => {
     expect(() => gateServer({ ...input, toolScope: { allow: null } as never })).toThrow(/tool selection/i);
     expect(() => gateServer({ ...input, server: {}, toolScope: { allow: [] } })).toThrow(/MCP server/i);

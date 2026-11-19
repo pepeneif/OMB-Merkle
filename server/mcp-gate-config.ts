@@ -222,7 +222,7 @@ export function gateServer(input: {
     ...(directory ? { OMB_GATE_DIRECTORY: "1" } : builtDirectory ? { OMB_GATE_DIRECTORY: "build" } : {}),
     ...(apps && !remote ? { [GATE_APPS_ENV]: JSON.stringify(apps) } : {}),
   };
-  if (input.configEnvName && ((!scoped && !(apps && !remote)) || !/^OMB_GATE_CONFIG_[a-f0-9]{64}$/.test(input.configEnvName))) {
+  if (input.configEnvName && ((!scoped && !(apps && !remote) && !builtDirectory) || !/^OMB_GATE_CONFIG_[a-f0-9]{64}$/.test(input.configEnvName))) {
     throw new Error("Invalid private MCP gate configuration.");
   }
   return {
