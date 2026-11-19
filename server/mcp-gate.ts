@@ -8,7 +8,8 @@ import { allowsTool, parseToolScope, type ToolScope } from "../shared/tool-scope
 import { bridgedCallTarget } from "./drivers/agents-bridge.ts";
 import { resolveCliSpawn } from "./env-path.ts";
 import { APP_ONLY_REFUSAL, AppObserver, GATE_APPS_ENV, modelVisible, parseAppMount, withUiExtension } from "./mcp-app-observer.ts";
-import { directoryCallTarget, isDirectoryTool } from "./mcp-directory.ts";
+import { CALL_TOOL, DESCRIBE_TOOL, SEARCH_TOOL, directoryCallTarget, isDirectoryTool } from "./mcp-directory.ts";
+import { buildDirectory, type BuiltDirectory } from "./mcp-gate-build-directory.ts";
 import { QUERY_TOOL, QUERY_TOOL_NAME, ResultStore, answerQuery, describeShape, exampleQuery } from "./mcp-shape.ts";
 import { fitToolList } from "./mcp-tool-schema.ts";
 import { DEFAULT_RESULT_BUDGET, type HeldResult, trimResultText, trimStructured } from "./mcp-trim.ts";
@@ -28,7 +29,8 @@ function gateEnvironment(): NodeJS.ProcessEnv {
     const value = JSON.parse(process.env[key] ?? "");
     if (!value || typeof value !== "object" || Array.isArray(value)
       || !["OMB_GATE_NAME", "OMB_GATE_UPSTREAM"].every(name => typeof value[name] === "string")
-      || (typeof value.OMB_GATE_TOOL_SCOPE !== "string" && typeof value[GATE_APPS_ENV] !== "string")
+      // A gate must be given something to do: a tool selection, an app mount, or a directory to build.
+      || (typeof value.OMB_GATE_TOOL_SCOPE !== "string" && typeof value[GATE_APPS_ENV] !== "string" && value.OMB_GATE_DIRECTORY !== "build")
       || !Object.entries(value).every(([name, setting]) => GATE_ENV_KEYS.includes(name) && typeof setting === "string")) throw new Error();
     return value;
   } catch {
@@ -45,6 +47,9 @@ const BUDGET = Number.isFinite(rawBudget) && rawBudget >= 0 ? rawBudget : DEFAUL
 const SPILL_MAX_AGE_MS = 24 * 60 * 60_000;
 const SPILL_HINT = gateEnv.OMB_GATE_SPILL_HINT === "1";
 const DIRECTORY = gateEnv.OMB_GATE_DIRECTORY === "1";
+/** Build a directory here for a server that lists its own tools: `built` until the catalog arrives. */
+const BUILD_DIRECTORY = gateEnv.OMB_GATE_DIRECTORY === "build";
+let built: BuiltDirectory | undefined;
 const SCHEMA_PROFILE = toolSchemaProfileFromEnv(process.env);
 const TOOL_LIMIT = toolLimitFromEnv(process.env);
 
@@ -283,12 +288,17 @@ type Pending =
   | { kind: "initialize"; original?: string };
 
 function callTarget(name: string, args: unknown): string | undefined {
-  return DIRECTORY ? directoryCallTarget(name, args) : name;
+  return DIRECTORY || (BUILD_DIRECTORY && built) ? directoryCallTarget(name, args) : name;
 }
 /** JSON-RPC string and numeric IDs are separate, even when their text is equal. */
 const pending = new Map<string, Pending>();
 
-createInterface({ input: process.stdin }).on("line", (line) => {
+createInterface({ input: process.stdin }).on("line", (line) => void handleLine(line).catch((error: unknown) => {
+  process.stderr.write(`mcp-gate(${NAME}): ${String(error)}\n`);
+  leave(1);
+}));
+
+async function handleLine(line: string): Promise<void> {
   let message: Json | undefined;
   if (line.trim()) {
     try {
@@ -326,6 +336,33 @@ createInterface({ input: process.stdin }).on("line", (line) => {
     const target = callTarget(params.name, params.arguments);
     if (target !== undefined && appOnly.has(target)) return rejectRequest(message.id, -32602, APP_ONLY_REFUSAL);
   }
+  // The directory's own three tools never reach the server: search and describe are answered here, and call_tool is
+  // forwarded under the real tool's name, so the server sees an ordinary call and its own validation still applies.
+  if (BUILD_DIRECTORY && built && message?.method === "tools/call" && id && typeof params?.name === "string") {
+    const name = params.name;
+    if (name === SEARCH_TOOL || name === DESCRIBE_TOOL || name === CALL_TOOL) {
+      let answer;
+      try {
+        answer = await built.call(name, params.arguments);
+      } catch (error) {
+        // A directory mistake ran nothing: answer it as a tool error and keep the connection.
+        process.stderr.write(`mcp-gate(${NAME}): tool directory: ${String(error)}\n`);
+        process.stdout.write(`${JSON.stringify({ jsonrpc: "2.0", id: message.id, result: { isError: true,
+          content: [{ type: "text", text: "The tool directory could not answer that. Say what you want to do in a few words and try again." }] } })}\n`);
+        return;
+      }
+      if ("answer" in answer) {
+        process.stdout.write(`${JSON.stringify({ jsonrpc: "2.0", id: message.id, result: { content: [{ type: "text", text: answer.answer }] } })}\n`);
+        return;
+      }
+      if (answer.run) {
+        const forwarded = { ...message, params: { ...params, name: answer.run.name, arguments: answer.run.arguments } };
+        pending.set(id, { kind: "call", tool: answer.run.name, trim: true, ...(observer ? { params: forwarded.params } : {}) });
+        child.stdin.write(`${JSON.stringify(forwarded)}\n`);
+        return;
+      }
+    }
+  }
   if (scope && message?.method === "tools/list" && !id) {
     return rejectRequest(message.id, -32600, "Tool listing needs a request ID");
   }
@@ -338,7 +375,8 @@ createInterface({ input: process.stdin }).on("line", (line) => {
     } else if (message.method === "initialize" && observer) {
       if (observer.mount.extension) {
         pending.set(id, { kind: "initialize", original: line });
-        return child.stdin.write(`${JSON.stringify({ ...message, params: withUiExtension(message.params) })}\n`);
+        child.stdin.write(`${JSON.stringify({ ...message, params: withUiExtension(message.params) })}\n`);
+        return;
       }
       pending.set(id, { kind: "initialize" });
     } else if (message.method === "tools/list" || scope) {
@@ -346,7 +384,7 @@ createInterface({ input: process.stdin }).on("line", (line) => {
     }
   }
   child.stdin.write(`${line}\n`);
-});
+}
 process.stdin.on("end", () => {
   child.stdin.end();
   captureTree();
@@ -398,6 +436,14 @@ createInterface({ input: child.stdout }).on("line", (line) => {
     }
     result.tools = result.tools.filter((tool: Json) => (DIRECTORY && isDirectoryTool(tool.name))
       || allowsTool(scope, { kind: "mcp", server: NAME, name: tool.name as string }));
+  }
+  // A server that lists its own tools gets the gate's three in their place: the whole catalog stays reachable through
+  // search_tools, so a turn pays for three schemas instead of dozens. A paged catalog, or one that already lists a
+  // directory, passes through untouched.
+  if (BUILD_DIRECTORY && !DIRECTORY && request?.kind === "list" && message.error === undefined && isRecord(result) && Array.isArray(result.tools)
+      && result.nextCursor === undefined && !result.tools.some((tool: unknown) => isRecord(tool) && isDirectoryTool(tool.name))) {
+    built = buildDirectory(result.tools, { server: NAME });
+    if (built) result.tools = built.listed();
   }
   if (SCHEMA_PROFILE && request?.kind === "list" && message.error === undefined && isRecord(result) && Array.isArray(result.tools)) {
     result.tools = fitToolList(result.tools, SCHEMA_PROFILE, (note) => process.stderr.write(`mcp-gate(${NAME}): ${note}\n`));

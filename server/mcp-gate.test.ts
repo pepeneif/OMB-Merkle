@@ -64,6 +64,26 @@ createInterface({ input: process.stdin }).on("line", (line) => {
 });
 `;
 
+/** Lists a catalog from CATALOG and answers calls with real MCP content, recording each tool it ran. */
+const CATALOG_UPSTREAM = `
+const { createInterface } = require("node:readline");
+const { appendFileSync, readFileSync } = require("node:fs");
+const catalog = JSON.parse(readFileSync(process.env.CATALOG, "utf8"));
+createInterface({ input: process.stdin }).on("line", (line) => {
+  const msg = JSON.parse(line);
+  if (msg.method === "tools/list") {
+    process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: msg.id, result: catalog }) + "\\n");
+    return;
+  }
+  if (msg.method === "tools/call") {
+    appendFileSync(process.env.SCRIPT + ".calls", msg.params.name + "\\n");
+    process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: msg.id, result: { content: [{ type: "text", text: "ran " + msg.params.name }] } }) + "\\n");
+    return;
+  }
+  process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: msg.id, result: {} }) + "\\n");
+});
+`;
+
 /** Answers tools/list with its script as the catalog. */
 const LISTING_UPSTREAM = `
 const { createInterface } = require("node:readline");
@@ -166,6 +186,17 @@ describe("mcp-gate", () => {
       expect(code).toBe(1);
       expect(existsSync(join(scratch, "reply.json.started"))).toBe(false);
     });
+  });
+
+  it("accepts a private configuration that only asks it to build a directory", async () => {
+    // The shape production sends for a built-in: no selection, no apps, just the directory to build. A gate that
+    // refused this would die at start and the turn would wait on it.
+    const key = `OMB_GATE_CONFIG_${"b".repeat(64)}`;
+    const settings = { OMB_GATE_NAME: "computer", OMB_GATE_UPSTREAM: JSON.stringify({ command: process.execPath, args: [join(scratch, "upstream.cjs")] }),
+      OMB_GATE_BUDGET: "8000", OMB_GATE_DIRECTORY: "build" };
+    start({}, { [key]: JSON.stringify(settings), CATALOG: join(scratch, "catalog.json") }, CATALOG_UPSTREAM, ["--config-env", key]);
+    const listed = await listCatalog({ tools: [{ name: "click", description: "Click a target.", inputSchema: { type: "object" } }] });
+    expect(listed.tools.map((tool: { name: string }) => tool.name)).toEqual(["search_tools", "describe_tool", "call_tool", "query_result"]);
   });
 
   it("leaves a small tool result exactly as the server sent it", async () => {
@@ -394,6 +425,58 @@ createInterface({ input: process.stdin }).on("line", (line) => {
     expect((await callWith("call_tool", { arguments: {} }, 4)).result.content[0].text).toHaveLength(4_000);
     expect((await callWith("call_tool", { name: "read", arguments: {} }, 5)).result.content[0].text).toContain("TRUNCATED by OpenMausBot");
     expect(ran()).toEqual(["describe_tool", "call_tool", "call_tool"]);
+  });
+
+  const listCatalog = async (catalog: unknown, id = 7, params: Record<string, unknown> = {}) => {
+    writeFileSync(join(scratch, "catalog.json"), JSON.stringify(catalog));
+    send({ jsonrpc: "2.0", id, method: "tools/list", params });
+    return JSON.parse(await nextLine()).result;
+  };
+
+  it("builds a directory in place of a local server's catalog, and every tool stays reachable", async () => {
+    // A realistic catalog: the computer lists dozens of driver tools, each with a schema of its own.
+    const tools: Array<Record<string, unknown>> = Array.from({ length: 40 }, (_, i) => ({
+      name: `computer_action_${i}`,
+      description: `Driver action number ${i} on this desktop, with its own parameters and its own long description of what it does and when to use it.`,
+      inputSchema: { type: "object", properties: { target: { type: "string", description: "Where to act." }, value: { type: "string" } }, required: ["target"] },
+    }));
+    tools[3] = { name: "computer_click", description: "Click at a point on the screen.", inputSchema: { type: "object", properties: { x: { type: "number" }, y: { type: "number" } } } };
+    const catalog = { tools };
+    start({}, { CATALOG: join(scratch, "catalog.json"), OMB_GATE_DIRECTORY: "build" }, CATALOG_UPSTREAM);
+    const listed = await listCatalog(catalog);
+
+    // The turn pays for three schemas, not for the server's own catalog.
+    expect(listed.tools.map((tool: { name: string }) => tool.name)).toEqual(["search_tools", "describe_tool", "call_tool", "query_result"]);
+    // The fixed cost of the directory (~2 KB: its three schemas plus the exact names) must be worth it.
+    const saved = Buffer.byteLength(JSON.stringify(catalog.tools)) - Buffer.byteLength(JSON.stringify(listed.tools));
+    expect(saved).toBeGreaterThan(7_000);
+
+    // Searching finds the real tool by what it does.
+    send({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "search_tools", arguments: { query: "click on the screen" } } });
+    expect(JSON.parse(await nextLine()).result.content[0].text).toContain("computer_click");
+
+    // Describing gives its exact input schema.
+    send({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "describe_tool", arguments: { name: "computer_click" } } });
+    expect(JSON.parse(await nextLine()).result.content[0].text).toContain('"x"');
+
+    // Calling runs it under its own name, so the server's validation still applies.
+    send({ jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "call_tool", arguments: { name: "computer_click", arguments: { x: 10, y: 20 } } } });
+    expect(JSON.parse(await nextLine()).result.content[0].text).toBe("ran computer_click");
+    expect(readFileSync(join(scratch, "reply.json.calls"), "utf8")).toBe("computer_click\n");
+  });
+
+  it("leaves a paged catalog as it came, so a directory never hides half of it", async () => {
+    start({}, { CATALOG: join(scratch, "catalog.json"), OMB_GATE_DIRECTORY: "build" }, CATALOG_UPSTREAM);
+    const listed = await listCatalog({ tools: [{ name: "read", inputSchema: { type: "object" } }], nextCursor: "second" }, 7, { cursor: "first" });
+    expect(listed.tools.map((tool: { name: string }) => tool.name)).toEqual(["read"]);
+  });
+
+  it("answers a directory mistake as a tool error without touching the server", async () => {
+    start({}, { CATALOG: join(scratch, "catalog.json"), OMB_GATE_DIRECTORY: "build" }, CATALOG_UPSTREAM);
+    await listCatalog({ tools: [{ name: "read", description: "Read a file.", inputSchema: { type: "object" } }] });
+    send({ jsonrpc: "2.0", id: 9, method: "tools/call", params: { name: "call_tool", arguments: { name: "not_a_tool", arguments: {} } } });
+    expect(JSON.parse(await nextLine()).result.content[0].text).toContain("No tool named");
+    expect(existsSync(join(scratch, "reply.json.calls"))).toBe(false);
   });
 
   it("treats those names as ordinary tools for any other upstream", async () => {
