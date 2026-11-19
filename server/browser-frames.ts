@@ -6,6 +6,8 @@ import { join } from "node:path";
 
 import { DATA_DIR } from "./config.ts";
 
+export type SettledFrame = { frame: { png: string; mime: string }; surface: "browser" | "computer" };
+
 /** Turns kept on disk: the one that just ended, the one before it, and the current one still writing. */
 export const KEPT_TURNS = 2;
 export const MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -68,4 +70,12 @@ export function pruneBrowserFrames(threadId: string, now = Date.now()): string[]
 function turnOf(file: string): string {
   const name = file.slice(file.lastIndexOf("/") + 1);
   return name.slice(name.indexOf("-") + 1, -".png".length);
+}
+
+/** 022 (Merkle): true when the settled frame was kept on disk instead of becoming a chat message. */
+export function keepBrowserFrame(threadId: string, turnId: string | undefined, settled: SettledFrame): boolean {
+  if (settled.surface !== "browser") return false;
+  saveBrowserFrame(threadId, turnId, settled.frame.png);
+  pruneBrowserFrames(threadId);
+  return true;
 }

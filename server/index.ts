@@ -455,8 +455,7 @@ import { browserEngineStatus } from "./browser-engine.ts";
 import { chromeLauncher } from "./browser/chrome/launcher.ts";
 import { botThreadLimitText, botThreadsHost, maxConcurrentBotThreads, maxConcurrentChildThreads } from "./bot-thread-limits.ts"; import { createBrowserSeats } from "./host/browser-seats.ts"; import { createBrowserHost } from "./host/browser.ts"; import { createCloudPlanTier } from "./host/cloud-plan-tier.ts";
 import { createScreenFrameSource, rememberTurnFrame, type ScreenCapture } from "./screen-frame-source.ts";
-import { screenFrameHash, screenSurfaceForTool, screenTouchingTool, settledFrameIsNews } from "./screen-frame-gate.ts";
-import { pruneBrowserFrames, saveBrowserFrame } from "./browser-frames.ts";
+import { screenFrameHash, screenSurfaceForTool, screenTouchingTool, settledFrameIsNews } from "./screen-frame-gate.ts"; import { keepBrowserFrame } from "./browser-frames.ts";
 import { asSchedule, RoutineRequestService } from "./routine-requests.ts"; import { ownerSpokeOnly } from "./cloud-routine-level.ts"; import { routineRunCard, routineRunFallbackText } from "./routine-run-card.ts";
 import { activeRoutinesContext } from "./active-routines-context.ts";
 import { createRefusedHandoffs } from "./host/refused-handoffs.ts"; import { automationContextText, createAutomationReports, newestAutomationLines, routineRunNeedsReview } from "./automation-reports.ts"; import { createAutomationDestinations } from "./automation-destinations.ts"; import { createTeamRoutines } from "./host/team-routines.ts"; import { botOwner } from "../shared/bot-owner.ts"; import { forgetMember } from "./bot-owners.ts"; import { createProactive } from "./host/proactive.ts"; import { createFirstHourHooks, startFirstHour, welcomeDonePatch } from "./host/first-hour-host.ts"; import { greetingMessage } from "./host/first-hour.ts"; import { READ_AND_DRAFT_PARTS, READ_AND_DRAFT_REFUSAL, READ_AND_DRAFT_TOOLS, recordsAnswer } from "./read-and-draft.ts"; import { createPresenceRoutes } from "./routes/presence.ts"; import { needsYouNow } from "./today.ts"; import { createTeamPresenceHost } from "./host/team-presence-host.ts";
@@ -6793,14 +6792,7 @@ bus.subscribe((event: RuntimeEvent) => {
             new Promise<null>((resolve) => { timeout = setTimeout(() => resolve(null), SCREEN_SETTLE_TIMEOUT_MS); }),
           ]).then((settled) => {
             if (!settled || !isCurrent()) return;
-            // 022 (Merkle): a browser screenshot never lands in the chat. It is kept on disk instead, for the last two
-            // turns and never past a day, so it can still be shown when someone asks for it.
-            if (settled.surface === "browser") {
-              saveBrowserFrame(event.threadId, completedTurnId, settled.frame.png);
-              pruneBrowserFrames(event.threadId);
-              return;
-            }
-            store.insertMessageAfter(event.threadId, settleLeafId, { role: "bot", kind: "screen", png: settled.frame.png, mime: settled.frame.mime });
+            if (!keepBrowserFrame(event.threadId, completedTurnId, settled)) store.insertMessageAfter(event.threadId, settleLeafId, { role: "bot", kind: "screen", png: settled.frame.png, mime: settled.frame.mime });
           }).catch(() => {}).finally(() => {
             clearTimeout(timeout);
           });
@@ -7452,7 +7444,7 @@ function shownScreenHash(threadId: string): string | undefined {
   return shown?.png ? screenFrameHash(shown.png) : undefined;
 }
 
-async function finalScreenFrame(_botId: string, threadId: string): Promise<{ frame: Frame; surface: "browser" | "computer" } | null> {
+async function finalScreenFrame(_botId: string, threadId: string): Promise<import("./browser-frames.ts").SettledFrame | null> {
   const entry = screenPollers.get(threadId);
   const owner = turnResourceOwners.get(threadId);
   if (!entry) return null;
