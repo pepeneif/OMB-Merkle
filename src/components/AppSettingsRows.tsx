@@ -7,6 +7,7 @@ import { withTourReset } from "@/lib/guided-tour";
 import { completionPatch } from "@/lib/onboarding";
 import { updaterMessage, useUpdaterState } from "@/lib/updater";
 import { productName } from "../lib/brand";
+import { useChatActivity } from "./ChatActivity";
 import { BrowserProfilesManager } from "./BrowserProfilesManager";
 import { UsbPhoneTakeoverSettings } from "./UsbPhoneTakeoverSettings";
 import { MoreText, SettingRow, SettingsGroup, SettingsRows, Switch } from "./SettingsPrimitives";
@@ -328,6 +329,21 @@ export function RunCardRow() {
         onClick={() => setShowRunCard(!enabled)}
       />
     </SettingRow>
+  );
+}
+
+/** Merkle: the header's "Chat activity" pill is gone. Its two switches live here, on Settings → Appearance → Chat. */
+export function ChatActivityRows() {
+  const activity = useChatActivity();
+  return (
+    <>
+      <SettingRow title={t("chat.automation.showInChat")} subtitle={t("chat.automation.showInChatHelp")}>
+        <Switch checked={activity.routines} aria-label={t("chat.automation.showInChat")} onClick={activity.toggleRoutines} />
+      </SettingRow>
+      <SettingRow title={t("chat.automation.showTools")} subtitle={t("chat.automation.showToolsHelp")}>
+        <Switch checked={activity.tools} aria-label={t("chat.automation.showTools")} onClick={activity.toggleTools} />
+      </SettingRow>
+    </>
   );
 }
 

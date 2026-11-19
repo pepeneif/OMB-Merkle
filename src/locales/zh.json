@@ -10085,5 +10085,9 @@
   "imageGen.higgsfield.connected": "已连接到你的 Higgsfield 账号",
   "imageGen.higgsfield.notConnected": "未连接，或登录已失效",
   "imageGen.higgsfield.help": "{app} 使用你在“插件”中登录的 Higgsfield 账号生成图片。每张图片都会消耗该账号的额度。",
-  "imageGen.higgsfield.open": "打开插件"
+  "imageGen.higgsfield.open": "打开插件",
+  "chat.automation.showInChat": "例行更新",
+  "chat.automation.showTools": "工具活动",
+  "chat.automation.showInChatHelp": "例行更新和已完成的运行会留在对话中。需要你处理的内容始终显示。",
+  "chat.automation.showToolsHelp": "显示机器人在对话中执行的每个工具。错误始终显示。"
 }

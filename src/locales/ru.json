@@ -7173,5 +7173,9 @@
   "imageGen.higgsfield.help": "{app} создаёт изображения через аккаунт Higgsfield, в который вы входите в разделе «Плагины». Каждое изображение расходует кредиты этого аккаунта.",
   "imageGen.higgsfield.open": "Открыть «Плагины»",
   "inbox.settled.title": "Завершено",
-  "inbox.settled.read": "Прочитано"
+  "inbox.settled.read": "Прочитано",
+  "chat.automation.showInChat": "Обновления рутин",
+  "chat.automation.showTools": "Активность инструментов",
+  "chat.automation.showInChatHelp": "Обновления рутин и завершённые запуски остаются в чате. То, что нужно вам, видно всегда.",
+  "chat.automation.showToolsHelp": "Показывать каждый инструмент, который бот запускает в чате. Ошибки видны всегда."
 }

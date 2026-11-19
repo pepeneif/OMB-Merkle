@@ -5917,5 +5917,9 @@
   "imageGen.higgsfield.help": "{app}, Eklentiler bölümünde oturum açtığınız Higgsfield hesabıyla görsel oluşturur. Her görsel o hesaptan kredi harcar.",
   "imageGen.higgsfield.open": "Eklentileri aç",
   "inbox.settled.title": "Tamamlandı",
-  "inbox.settled.read": "Okundu"
+  "inbox.settled.read": "Okundu",
+  "chat.automation.showInChat": "Rutin güncellemeleri",
+  "chat.automation.showTools": "Araç etkinliği",
+  "chat.automation.showInChatHelp": "Rutin güncellemeleri ve biten çalışmalar sohbette kalır. Sizi bekleyen her şey her zaman görünür.",
+  "chat.automation.showToolsHelp": "Bir botun sohbette çalıştırdığı her aracı göster. Hatalar her zaman görünür."
 }

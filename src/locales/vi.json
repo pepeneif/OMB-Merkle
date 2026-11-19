@@ -5917,5 +5917,9 @@
   "imageGen.higgsfield.help": "{app} tạo ảnh bằng tài khoản Higgsfield mà bạn đăng nhập trong Plugin. Mỗi ảnh tốn tín dụng của tài khoản đó.",
   "imageGen.higgsfield.open": "Mở Plugin",
   "inbox.settled.title": "Đã xong",
-  "inbox.settled.read": "Đã đọc"
+  "inbox.settled.read": "Đã đọc",
+  "chat.automation.showInChat": "Cập nhật quy trình",
+  "chat.automation.showTools": "Hoạt động công cụ",
+  "chat.automation.showInChatHelp": "Cập nhật quy trình và lượt chạy đã xong vẫn ở trong cuộc trò chuyện. Điều cần bạn luôn hiển thị.",
+  "chat.automation.showToolsHelp": "Hiện mọi công cụ bot chạy trong cuộc trò chuyện. Lỗi luôn hiển thị."
 }

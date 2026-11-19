@@ -11266,5 +11266,7 @@
   "insights.other": "Outros",
   "insights.breakdown": "Detalhamento",
   "insights.byHour": "Por hora",
-  "insights.share": "Participação"
+  "insights.share": "Participação",
+  "chat.automation.showInChatHelp": "As atualizações de rotinas e as execuções concluídas ficam no chat. O que precisa de você sempre aparece.",
+  "chat.automation.showToolsHelp": "Mostra cada ferramenta que um bot executa no chat. Erros sempre aparecem."
 }

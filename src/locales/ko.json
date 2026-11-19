@@ -7649,5 +7649,9 @@
   "imageGen.higgsfield.help": "{app}은(는) 플러그인에서 로그인한 Higgsfield 계정으로 이미지를 만듭니다. 이미지마다 그 계정의 크레딧이 소모됩니다.",
   "imageGen.higgsfield.open": "플러그인 열기",
   "inbox.settled.title": "완료됨",
-  "inbox.settled.read": "읽음"
+  "inbox.settled.read": "읽음",
+  "chat.automation.showInChat": "루틴 업데이트",
+  "chat.automation.showTools": "도구 활동",
+  "chat.automation.showInChatHelp": "루틴 업데이트와 완료된 실행은 채팅에 남습니다. 당신이 필요한 것은 항상 표시됩니다.",
+  "chat.automation.showToolsHelp": "채팅에서 봇이 실행하는 각 도구를 표시합니다. 오류는 항상 표시됩니다."
 }

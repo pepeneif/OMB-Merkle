@@ -14,6 +14,7 @@ vi.mock("@/lib/cloud-guest", () => ({ useCanWriteIn: () => true, useReactor: () 
 vi.mock("./ModelPicker", () => ({ ModelPicker: () => null }));
 
 const { ChatView } = await import("./ChatView");
+const { chatActivityMessages } = await import("./ChatActivity");
 const { BotEditorStore, initialState } = await import("@/state/store");
 const { t } = await import("@/lib/i18n");
 
@@ -75,42 +76,31 @@ afterAll(() => {
 });
 
 describe("an automation's line in the chat", () => {
-  it("lets Advanced mode hide routine updates and open the bot's run history", async () => {
+  it("draws the chat without the header's Chat activity pill", async () => {
     localStorage.setItem("omb-advanced-mode", "1");
     try {
-      await draw(transcript([
-        { id: "routine", parentId: "m2", role: "bot", kind: "text", text: "No new calls.", at: at(3), automation: line("run-1") },
-        { id: "resolved-tool", parentId: "routine", role: "bot", kind: "options", at: at(4), automation: line("run-1", { copyOf: "tool-1" }), card: { title: "Tool call", subtitle: "Read fixture", options: ["Allow", "Deny"], requestId: "tool-1", tool: "Bash", answered: "allow" } },
-        { id: "pending-tool", parentId: "resolved-tool", role: "bot", kind: "options", at: at(5), automation: line("run-1", { copyOf: "tool-2", needsYou: true }), card: { title: "Pending tool call", subtitle: "Read fixture", options: ["Allow", "Deny"], requestId: "tool-2", tool: "Bash" } },
-        { id: "approval", parentId: "pending-tool", role: "bot", kind: "text", text: "Please confirm.", at: at(6), automation: line("run-2", { needsYou: true }) },
-      ]));
-      const button = (name: string) => [...document.querySelectorAll("button")].find((item) => item.textContent?.trim() === name)!;
-      flushSync(() => button(t("chat.automation.activity")).click());
-      flushSync(() => document.querySelector<HTMLButtonElement>('[role="switch"][aria-label="' + t("chat.automation.showInChat") + '"]')!.click());
-      expect(document.querySelector('[data-mid="routine"]')).toBeNull();
-      expect(document.querySelector('[data-mid="approval"]')?.textContent).toContain("Please confirm.");
-      expect(document.querySelector('[data-mid="m2"]')?.textContent).toContain("Here is the draft.");
-      expect(localStorage.getItem("omb-advanced-chat-automation")).toBe("hide");
-      const tools = document.querySelector<HTMLButtonElement>('[role="switch"][aria-label="' + t("chat.automation.showTools") + '"]')!;
-      expect(tools.getAttribute("aria-checked")).toBe("true");
-      expect(document.querySelector('[data-mid="resolved-tool"]')).not.toBeNull();
-      flushSync(() => tools.click());
-      expect(tools.getAttribute("aria-checked")).toBe("false");
-      expect(document.querySelector('[data-mid="resolved-tool"]')).toBeNull();
-      expect(document.querySelector('[data-mid="pending-tool"]')).not.toBeNull();
-      expect(document.querySelector('[data-mid="approval"]')?.textContent).toContain("Please confirm.");
-      flushSync(() => tools.click());
-
-      dispatch.mockClear();
-      flushSync(() => button(t("chat.automation.openLogs")).click());
-      expect(dispatch).toHaveBeenCalledWith({ type: "showRoutines", section: "logs", botId: "pepper" });
-      flushSync(() => document.querySelector<HTMLButtonElement>('[role="switch"][aria-label="' + t("chat.automation.showInChat") + '"]')!.click());
-      expect(document.querySelector('[data-mid="routine"]')?.textContent).toContain("No new calls.");
+      await draw(transcript([]));
+      expect([...document.querySelectorAll("button")].some((item) => item.textContent?.trim() === t("chat.automation.activity"))).toBe(false);
     } finally {
       localStorage.removeItem("omb-advanced-mode");
-      localStorage.removeItem("omb-advanced-chat-automation");
-      localStorage.removeItem("omb-advanced-chat-tools");
     }
+  });
+
+  it("hides routine updates and finished tools when the person asks, and never what needs them", () => {
+    const rows: Message[] = [
+      { id: "routine", parentId: null, role: "bot", kind: "text", text: "No new calls.", at: at(3), automation: line("run-1") },
+      { id: "resolved-tool", parentId: "routine", role: "bot", kind: "options", at: at(4), automation: line("run-1", { copyOf: "tool-1" }), card: { title: "Tool call", subtitle: "Read fixture", options: ["Allow", "Deny"], requestId: "tool-1", tool: "Bash", answered: "allow" } },
+      { id: "pending-tool", parentId: "resolved-tool", role: "bot", kind: "options", at: at(5), automation: line("run-1", { copyOf: "tool-2", needsYou: true }), card: { title: "Pending tool call", subtitle: "Read fixture", options: ["Allow", "Deny"], requestId: "tool-2", tool: "Bash" } },
+      { id: "approval", parentId: "pending-tool", role: "bot", kind: "text", text: "Please confirm.", at: at(6), automation: line("run-2", { needsYou: true }) },
+    ];
+    const on = { routines: true, tools: true, toggleRoutines() {}, toggleTools() {} };
+    const ids = (activity: typeof on) => chatActivityMessages(rows, true, activity).map((row) => row.id);
+    expect(ids(on)).toEqual(["routine", "resolved-tool", "pending-tool", "approval"]);
+    // A finished tool row still draws until the person also hides tools.
+    expect(ids({ ...on, routines: false })).toEqual(["resolved-tool", "pending-tool", "approval"]);
+    // A copy that still needs the person is never hidden.
+    expect(ids({ ...on, tools: false })).toEqual(["routine", "pending-tool", "approval"]);
+    expect(ids({ ...on, routines: false, tools: false })).toEqual(["pending-tool", "approval"]);
   });
 
   it("is the bot's own message under the automation's name, with its run one click away", async () => {

@@ -4052,5 +4052,9 @@
   "geminiServer.key": "Gemini-API-Schlüssel",
   "geminiServer.add": "Google AI Studio hinzufügen",
   "inbox.settled.title": "Erledigt",
-  "inbox.settled.read": "Gelesen"
+  "inbox.settled.read": "Gelesen",
+  "chat.automation.showInChat": "Routine-Updates",
+  "chat.automation.showTools": "Tool-Aktivität",
+  "chat.automation.showInChatHelp": "Routine-Updates und beendete Läufe bleiben im Chat. Was dich braucht, wird immer gezeigt.",
+  "chat.automation.showToolsHelp": "Zeigt jedes Tool, das ein Bot im Chat ausführt. Fehler erscheinen immer."
 }

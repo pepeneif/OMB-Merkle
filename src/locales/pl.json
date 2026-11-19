@@ -7119,5 +7119,9 @@
   "imageGen.higgsfield.help": "{app} tworzy obrazy na koncie Higgsfield, na które logujesz się w sekcji Wtyczki. Każdy obraz zużywa kredyty z tego konta.",
   "imageGen.higgsfield.open": "Otwórz Wtyczki",
   "inbox.settled.title": "Zakończone",
-  "inbox.settled.read": "Przeczytane"
+  "inbox.settled.read": "Przeczytane",
+  "chat.automation.showInChat": "Aktualizacje rutyn",
+  "chat.automation.showTools": "Aktywność narzędzi",
+  "chat.automation.showInChatHelp": "Aktualizacje rutyn i zakończone uruchomienia zostają w czacie. To, co cię potrzebuje, zawsze jest widoczne.",
+  "chat.automation.showToolsHelp": "Pokazuj każde narzędzie, które bot uruchamia w czacie. Błędy są zawsze widoczne."
 }

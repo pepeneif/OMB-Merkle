@@ -2646,6 +2646,8 @@
   "chat.automation.activity": "Chat activity",
   "chat.automation.showInChat": "Routine updates",
   "chat.automation.showTools": "Tool activity",
+  "chat.automation.showInChatHelp": "Routine updates and finished runs stay in the chat. Anything that still needs you always shows.",
+  "chat.automation.showToolsHelp": "Show each tool a bot runs in the chat. Errors always show.",
   "chat.automation.openLogs": "Open run history",
   "chat.automation.openRun": "See run",
   "chat.automation.openRunFor": "See the run behind this {name} message",

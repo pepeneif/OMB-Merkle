@@ -7956,5 +7956,9 @@
   "imageGen.higgsfield.help": "{app} は、プラグインでサインインした Higgsfield アカウントで画像を作ります。画像 1 枚ごとにそのアカウントのクレジットを消費します。",
   "imageGen.higgsfield.open": "プラグインを開く",
   "inbox.settled.title": "完了",
-  "inbox.settled.read": "既読"
+  "inbox.settled.read": "既読",
+  "chat.automation.showInChat": "ルーティンの更新",
+  "chat.automation.showTools": "ツールの動作",
+  "chat.automation.showInChatHelp": "ルーティンの更新と完了した実行はチャットに残ります。あなたが必要なものは常に表示されます。",
+  "chat.automation.showToolsHelp": "チャットでボットが実行する各ツールを表示します。エラーは常に表示されます。"
 }

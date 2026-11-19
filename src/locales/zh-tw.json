@@ -10184,5 +10184,9 @@
   "imageGen.higgsfield.help": "{app} 使用你在「外掛」中登入的 Higgsfield 帳號產生圖片。每張圖片都會消耗該帳號的額度。",
   "imageGen.higgsfield.open": "開啟外掛",
   "inbox.settled.title": "已完成",
-  "inbox.settled.read": "已讀"
+  "inbox.settled.read": "已讀",
+  "chat.automation.showInChat": "例行更新",
+  "chat.automation.showTools": "工具活動",
+  "chat.automation.showInChatHelp": "例行更新與已完成的執行會留在對話中。需要你處理的內容一律顯示。",
+  "chat.automation.showToolsHelp": "顯示機器人在對話中執行的每個工具。錯誤一律顯示。"
 }

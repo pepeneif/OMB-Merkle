@@ -3824,5 +3824,9 @@
   "imageGen.higgsfield.help": "{app} crée des images avec le compte Higgsfield auquel vous vous connectez sous Plugins. Chaque image consomme des crédits de ce compte.",
   "imageGen.higgsfield.open": "Ouvrir Plugins",
   "inbox.settled.title": "Terminé",
-  "inbox.settled.read": "Lu"
+  "inbox.settled.read": "Lu",
+  "chat.automation.showInChat": "Mises à jour des routines",
+  "chat.automation.showTools": "Activité des outils",
+  "chat.automation.showInChatHelp": "Les mises à jour des routines et les exécutions terminées restent dans la discussion. Ce qui vous attend s'affiche toujours.",
+  "chat.automation.showToolsHelp": "Affiche chaque outil qu'un bot exécute dans la discussion. Les erreurs s'affichent toujours."
 }

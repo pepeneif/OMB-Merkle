@@ -3678,5 +3678,9 @@
   "imageGen.higgsfield.help": "{app} उस Higgsfield खाते से तस्वीरें बनाता है जिससे आप प्लगइन में साइन इन करते हैं। हर तस्वीर उस खाते के क्रेडिट खर्च करती है।",
   "imageGen.higgsfield.open": "प्लगइन खोलें",
   "inbox.settled.title": "पूर्ण",
-  "inbox.settled.read": "पढ़ा गया"
+  "inbox.settled.read": "पढ़ा गया",
+  "chat.automation.showInChat": "रूटीन अपडेट",
+  "chat.automation.showTools": "टूल गतिविधि",
+  "chat.automation.showInChatHelp": "रूटीन अपडेट और पूरी हुई रन चैट में रहते हैं। जो आपको चाहिए वह हमेशा दिखता है।",
+  "chat.automation.showToolsHelp": "चैट में बॉट जो भी टूल चलाता है उसे दिखाएँ। त्रुटियाँ हमेशा दिखती हैं।"
 }

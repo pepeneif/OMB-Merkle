@@ -1,9 +1,5 @@
-import { useMemo, useState, type CSSProperties } from "react";
-import { List } from "lucide-react";
-import { Switch } from "./SettingsPrimitives";
-import { t } from "@/lib/i18n";
+import { useMemo, useState } from "react";
 import type { Message } from "@/state/store";
-import { useStoreDispatch } from "@/state/store-select";
 
 /** Advanced mode's "Chat activity": whether routine updates and finished tool entries show in the chat, kept on this device. */
 export interface ChatActivity {
@@ -47,35 +43,4 @@ export function chatActivityMessages(messages: Message[], advanced: boolean, act
     if (message.kind === "routine.run") return message.routineRun?.status === "waiting" || message.routineRun?.status === "failed";
     return !message.automation || Boolean(message.automation.needsYou || message.automation.failed || message.automation.partial || message.automation.copyOf);
   });
-}
-
-/** The chat header's Chat activity button and, once opened, its two switches and the way to the bot's run history. */
-export function ChatActivityControls({ activity, botId, style }: { activity: ChatActivity; botId: string; style?: CSSProperties }) {
-  const dispatch = useStoreDispatch();
-  const [open, setOpen] = useState(false);
-  return (
-    <section aria-label={t("chat.automation.activity")} className="flex min-w-0 flex-wrap items-center gap-1.5" style={style}>
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((was) => !was)}
-        className="ui-pill shrink-0"
-      ><List size={14} aria-hidden="true" />{t("chat.automation.activity")}</button>
-      {open && (
-        <section className="chat-run-log-actions flex min-w-0 flex-wrap items-center gap-1.5">
-          <label className="ui-pill shrink-0">
-            {t("chat.automation.showInChat")}
-            <Switch compact aria-label={t("chat.automation.showInChat")} checked={activity.routines} onClick={activity.toggleRoutines} />
-          </label>
-          <label className="ui-pill shrink-0">
-            {t("chat.automation.showTools")}
-            <Switch compact aria-label={t("chat.automation.showTools")} checked={activity.tools} onClick={activity.toggleTools} />
-          </label>
-          <button type="button" className="ui-pill" onClick={() => dispatch({ type: "showRoutines", section: "logs", botId })}>
-            {t("chat.automation.openLogs")}
-          </button>
-        </section>
-      )}
-    </section>
-  );
 }

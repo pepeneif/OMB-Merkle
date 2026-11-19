@@ -4098,5 +4098,9 @@
   "imageGen.higgsfield.help": "{app} створює зображення через акаунт Higgsfield, у який ви входите в розділі «Плагіни». Кожне зображення витрачає кредити цього акаунта.",
   "imageGen.higgsfield.open": "Відкрити «Плагіни»",
   "inbox.settled.title": "Завершено",
-  "inbox.settled.read": "Прочитано"
+  "inbox.settled.read": "Прочитано",
+  "chat.automation.showInChat": "Оновлення рутин",
+  "chat.automation.showTools": "Активність інструментів",
+  "chat.automation.showInChatHelp": "Оновлення рутин і завершені запуски залишаються в чаті. Те, що потребує вас, видно завжди.",
+  "chat.automation.showToolsHelp": "Показувати кожен інструмент, який бот запускає в чаті. Помилки видно завжди."
 }
