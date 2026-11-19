@@ -29,7 +29,7 @@ describe("MCP scope configuration", () => {
   });
 
   it("still rejects a private registry whose work the guard does not know", () => {
-    expect(() => gateServer({ ...input, schemaProfile: "compact", configEnvName: "OMB_GATE_CONFIG_" + "b".repeat(64) }))
+    expect(() => gateServer({ ...input, schemaProfile: "moonshot", configEnvName: "OMB_GATE_CONFIG_" + "b".repeat(64) }))
       .toThrow(/Invalid private MCP gate configuration/);
   });
 

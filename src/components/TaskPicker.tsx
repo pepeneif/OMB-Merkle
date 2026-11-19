@@ -353,7 +353,7 @@ function ConversationTaskPicker({
                         startRename(task);
                       }}
                       className="min-w-0 flex-1 text-left"
-                      title={t("task.renameHint")}
+                      title={task.title?.trim() || localizedTaskTitle(task.title) || t("task.renameHint")}
                     >
                       <div dir="auto" className="truncate text-[13px] text-ink">{localizedTaskTitle(task.title)}</div>
                       <div className="text-[11px] text-ink-secondary">
