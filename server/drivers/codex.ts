@@ -68,8 +68,7 @@ export { codexUpdateCommand };
 import { effectiveApprovalPolicy, effectiveApprovalsReviewer } from "./codex-approval-config.ts"; import { AGENTS_TOOL_TIMEOUT_SECONDS } from "./agents-tool-limit.ts"; import { COMPUTER_PROXY_TIMEOUT_MS } from "../harness-budget.ts";
 import { canUseMcpServer } from "../../shared/tool-scope.ts";
 import { assertToolScopeSupported } from "../../shared/tool-scope-support.ts";
-import { appMountFor, gateServer, mcpStdioServer } from "../mcp-gate-config.ts"; import { OWN_APPS_SERVER } from "../../shared/own-apps.ts";
-import { CALL_TOOL, DESCRIBE_TOOL, SEARCH_TOOL, directoryCallTarget } from "../mcp-directory.ts"; import { codexCommandOutput, codexPatchProgress } from "./tool-progress.ts";
+import { appMountFor, gateServer, mcpStdioServer } from "../mcp-gate-config.ts"; import { OWN_APPS_SERVER } from "../../shared/own-apps.ts"; import { buildsDirectory } from "../mcp-gate-build-directory.ts"; import { CALL_TOOL, DESCRIBE_TOOL, SEARCH_TOOL, directoryCallTarget } from "../mcp-directory.ts"; import { codexCommandOutput, codexPatchProgress } from "./tool-progress.ts";
 
 export { decodeCodexSelection, readCodexModelCatalog, STATIC_CODEX_MODELS } from "./codex-catalog.ts";
 
@@ -567,14 +566,14 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
           // schemaValidation), and Codex does not speak SSE. A plan turn has no tool_search, so its URL
           // servers use the proxy's tool directory.
           const directory = plan && "url" in server;
-          const apps = appMountFor(name, turn);
-          if (turn.toolScope === undefined && !("url" in server) && !apps) return server;
+          const builtDirectory = !("url" in server) && buildsDirectory(name), apps = appMountFor(name, turn);
+          if (turn.toolScope === undefined && !("url" in server) && !apps && !builtDirectory) return server;
           const hash = createHash("sha256").update(mountName).digest("hex");
           // Codex starts MCP children with only a few env names.
           const proxy = turn.toolScope === undefined && "url" in server
             ? mcpStdioServer(server, { nodeEnv: { ELECTRON_RUN_AS_NODE: "1" }, ...(directory ? { directory: { name } } : {}), configEnvName: `OMB_REMOTE_MCP_CONFIG_${hash}`, sourceEnv: env, apps })
-            : gateServer({ name, server, threadId, budget: 0, toolScope: turn.toolScope, nodeEnv: { ELECTRON_RUN_AS_NODE: "1" }, configEnvName: `OMB_GATE_CONFIG_${hash}`, directory, sourceEnv: env, apps });
-          if (proxy && directory) directoryMounts.add(mountName);
+            : gateServer({ name, server, threadId, budget: 0, toolScope: turn.toolScope, nodeEnv: { ELECTRON_RUN_AS_NODE: "1" }, configEnvName: `OMB_GATE_CONFIG_${hash}`, directory, sourceEnv: env, apps, buildDirectory: builtDirectory });
+          if (proxy && (directory || builtDirectory)) directoryMounts.add(mountName);
           if (!proxy) return null;
           const shared = { ...proxy.env };
           if (turn.toolScope === undefined) {

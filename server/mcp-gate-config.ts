@@ -181,14 +181,18 @@ export function gateServer(input: {
   schemaProfile?: ToolSchemaProfileId;
   /** The engine's provider limits how many tools a request carries: the gate lists at most OMB_TOOL_LIMIT of them. */
   limitsTools?: boolean;
+  /** List three tools (search, describe, call) in place of this server's catalog, built here: for a local server whose
+   * dozens of schemas would otherwise ride along on every request. Nothing is dropped; every tool stays reachable. */
+  buildDirectory?: boolean;
 }): { command: string; args: string[]; env: Record<string, string> } | null {
-  const { name, server, budget, apps, schemaProfile, limitsTools } = input;
+  const { name, server, budget, apps, schemaProfile, limitsTools, buildDirectory } = input;
   const parsed = parseToolScope(input.toolScope);
   if (!parsed.ok) throw new Error(parsed.error);
   const scoped = parsed.scope !== undefined;
   const remote = remoteMcpSpec(server) !== undefined;
-  if (budget <= 0 && !scoped && !apps && !schemaProfile && !limitsTools) return null;
+  if (budget <= 0 && !scoped && !apps && !schemaProfile && !limitsTools && buildDirectory !== true) return null;
   const directory = input.directory === true && remote;
+  const builtDirectory = buildDirectory === true;
   const proxyOptions = {
     nodeEnv: input.nodeEnv,
     execPath: input.execPath,
@@ -215,7 +219,7 @@ export function gateServer(input: {
     OMB_GATE_SPILL_DIR: spillDir(input.threadId),
     OMB_GATE_BUDGET: String(budget),
     ...(scoped ? { OMB_GATE_TOOL_SCOPE: JSON.stringify(parsed.scope) } : {}),
-    ...(directory ? { OMB_GATE_DIRECTORY: "1" } : {}),
+    ...(directory ? { OMB_GATE_DIRECTORY: "1" } : builtDirectory ? { OMB_GATE_DIRECTORY: "build" } : {}),
     ...(apps && !remote ? { [GATE_APPS_ENV]: JSON.stringify(apps) } : {}),
   };
   if (input.configEnvName && ((!scoped && !(apps && !remote)) || !/^OMB_GATE_CONFIG_[a-f0-9]{64}$/.test(input.configEnvName))) {
