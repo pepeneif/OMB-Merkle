@@ -128,6 +128,21 @@ describe("optional bot thread picker", () => {
     expect(renderToStaticMarkup(createElement(TaskPicker, { bot }))).toContain('aria-label="All threads"');
   });
 
+  it("closed, names the whole conversation on hover instead of its cache statistics", () => {
+    const title = "Plan the Q1 launch in Osaka with the whole team and a long list of open questions";
+    const chatty = {
+      ...bot,
+      tasks: bot.tasks!.map((task) => task.threadId === "current"
+        ? { ...task, title, usage: { input: 120_000, output: 4_000, cachedInput: 96_000, costUsd: null, turns: 12 } }
+        : task),
+    } as Bot;
+    const markup = renderToStaticMarkup(createElement(TaskPicker, { bot: chatty }));
+    const button = markup.match(/<button[^>]*title="([^"]*)"/)![1]!;
+    expect(button).toBe(title);
+    expect(button).not.toContain("cached");
+    expect(button).not.toContain("All threads");
+  });
+
   it("hides quiet histories and creation but keeps sibling activity reachable", () => {
     fixture.showThreads = false;
     fixture.queued = { queued: [{ queueId: "pending" }] };

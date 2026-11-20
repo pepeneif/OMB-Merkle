@@ -205,15 +205,9 @@ function ConversationTaskPicker({
     if (title) onRename(threadId, title);
   };
 
-  const u = current?.usage;
-  const currentLabel = u ? formatTaskTokens(headlineTokens(u)) : null;
-  const switchTitle =
-    u && currentLabel
-      ? t("task.switchWithUsageDetail", {
-          label: currentLabel,
-          detail: usageDetail(u),
-        })
-      : t("task.switch");
+  // A21 (Manager): cerrada, la pastilla nombra el hilo completo que se esta viendo.
+  // Las estadisticas de cache viven en el chip de uso de la cabecera, no en este tooltip.
+  const pillTitle = current ? localizedTaskTitle(current.title?.trim() || t("task.newShort")) : t("task.switch");
   const grouped = bot ? groupThreadTasks(tasks, bot.projects ?? [], query) : null;
   const visible = grouped ? grouped.flatMap((group) => group.tasks) : filterTasks(tasks, query);
   const attentionNeedle = query.trim().toLowerCase();
@@ -230,7 +224,7 @@ function ConversationTaskPicker({
           if (open) closeMenu();
           else setOpen(true);
         }}
-        title={switchTitle}
+        title={pillTitle}
         aria-label={t("task.switch")}
         className={cn(
           variant === "header"
