@@ -50,8 +50,8 @@ describe("letting go of paged rows when a conversation is left", () => {
     const left = reducer(away(bot()), { type: "trimHeldMessages", threadId: "thread-1" });
     const stale = reducer(left, { type: "olderMessages", threadId: "thread-1", generation: 0, before: "m0", messages: [message(-1)], hasMore: false });
     expect(ids(stale.bots[0]!)).toEqual(ids(left.bots[0]!));
-    const fresh = reducer(left, { type: "olderMessages", threadId: "thread-1", generation: 0, before: "m2800", messages: thread(2_800).slice(-200), hasMore: true });
-    expect(ids(fresh.bots[0]!)[0]).toBe("m2600");
-    expect(fresh.bots[0]!.messages).toHaveLength(400);
+    const fresh = reducer(left, { type: "olderMessages", threadId: "thread-1", generation: 0, before: "m2800", messages: thread(2_800).slice(-50), hasMore: true });
+    expect(ids(fresh.bots[0]!)[0]).toBe("m2750");
+    expect(fresh.bots[0]!.messages).toHaveLength(250);
   });
 });

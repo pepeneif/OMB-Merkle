@@ -3,7 +3,7 @@ import { api } from "./api";
 import { visibleMessages } from "./snapshot-navigation";
 import type { Action, AppState, Message } from "./store";
 
-export const MESSAGE_PAGE_SIZE = 200;
+export const MESSAGE_PAGE_SIZE = 50;
 type OlderMessages = Extract<Action, { type: "olderMessages" }>;
 type LoadOlderMessages = Extract<Action, { type: "loadOlderMessages" }>;
 type TrimHeldMessages = Extract<Action, { type: "trimHeldMessages" }>;
@@ -30,9 +30,11 @@ export function reduceOlderMessages(state: AppState, action: OlderMessages): App
   return { ...state, loadingOlder, bots, groups, unreadDivider };
 }
 
-/** Rows a conversation keeps once the reader has left it, and the most it keeps to put a reader's place back. */
-export const HELD_AFTER_LEAVING = MESSAGE_PAGE_SIZE;
-export const HELD_FOR_PLACE = 3 * MESSAGE_PAGE_SIZE;
+/** Rows a conversation keeps once the reader has left it, and the most it keeps to put a reader's place back.
+ * Fixed rather than derived from the page size: they measure local memory, not the network, so a smaller page
+ * (0008) must not shrink the window the reader comes back to. */
+export const HELD_AFTER_LEAVING = 200;
+export const HELD_FOR_PLACE = 600;
 
 /** The newest rows of `owner`, from `keepFromId` when that is close enough to the end, never cutting off its pinned
  * message or the leaf of the branch it shows. */
