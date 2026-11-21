@@ -5801,11 +5801,20 @@ async function mountHostComputer(owner: TurnOwner, botId: string, providerSuppor
 async function mountBotVps(
   bot: BotRecord,
   owner: TurnOwner,
-  opts: { start: boolean; onClaimed: (capture: () => Promise<{ png: string; format: string }>) => void; onRejected?: (failure: string) => void },
+  opts: {
+    start: boolean;
+    /** Auto: the desktop is proven only when the turn uses it, not on the way to the first token. */
+    deferDesktop?: boolean;
+    onClaimed: (capture: () => Promise<{ png: string; format: string }>) => void;
+    onRejected?: (failure: string) => void;
+  },
 ) {
   const botVpsConfig = vpsConfigForBot(cfg, bot);
   const vpsResource = `computer:vps:${vpsSshAliasForBot(cfg, bot)}:${bot.id}`;
-  const remote = await (opts.start ? vps.vpsComputerAction("provision", botVpsConfig, bot.id) : vps.inspectVpsForAuto(botVpsConfig, bot.id));
+  // A running container mounts before the first token; its desktop is proven on first use. A start or a cold
+  // container still verifies the whole desktop, which is the only case the price of that check buys anything.
+  const deferDesktop = opts.deferDesktop === true;
+  const remote = await (opts.start ? vps.vpsComputerAction("provision", botVpsConfig, bot.id, undefined, { deferDesktop }) : vps.inspectVpsForAuto(botVpsConfig, bot.id, undefined, { desktop: !deferDesktop }));
   if (!remote?.ready || !remote.sshAlias) return { problem: remote?.problem ?? null, reachable: remote?.daemonUp === true, outdated: vpsDesktopOutdated(remote) };
   const targetCfg = { ...cfg, vps: { sshAlias: remote.sshAlias } };
   const vpsMcp = vps.vpsComputerMcp(targetCfg, bot.id, remote.container_id ?? undefined);
@@ -5819,6 +5828,7 @@ async function mountBotVps(
     onRejected: opts.onRejected,
     claim: async () => {
       await bindTurnComputer(owner, vpsResource, true);
+      // The first screen call proves the driver too; a failure here falls back to the full inspection by the capture.
       opts.onClaimed(vpsCapture);
     },
   });
@@ -8128,8 +8138,12 @@ async function beginTurn(
         if ((wants === "cloud" || (wants === undefined && managedPolicy.computerAllowed("vps"))) && cloudBackend === "vps" &&
             canWorkOnCloud(cloudEngine(instance))) {
           vpsThreadStarted(bot.id, threadId);
+          const vpsStart = vps.vpsStartsForTurn({ wants, autoStartVps: bot.autoStartVps, automationSource: opts?.automationSource });
           const mounted = await mountBotVps(bot, resourceOwner, {
-            start: vps.vpsStartsForTurn({ wants, autoStartVps: bot.autoStartVps, automationSource: opts?.automationSource }),
+            start: vpsStart,
+            // Auto and a named Cloud place both mount a running container now and prove the desktop on first use:
+            // a named place still starts a stopped container, and that start checks the desktop in full.
+            deferDesktop: true,
             onClaimed: (vpsCapture) => {
               pinAutoSurface("cloud");
               adoptClaimedCapture(vpsCapture);

@@ -78,14 +78,19 @@ export function prepareVpsSsh(dataDir: string, pathValue: string, platform: Node
   mkdirSync(binDir, { recursive: true, mode: 0o700 });
   chmodSync(sshDir, 0o700);
   const configPath = join(sshDir, "config");
-  writeIfChanged(configPath, vpsSshConfigText(controlDirectory(sshDir)), 0o600);
+  const controlDir = controlDirectory(sshDir);
+  writeIfChanged(configPath, vpsSshConfigText(controlDir), 0o600);
   const realSsh = findExecutable("ssh", pathValue, binDir);
   if (!realSsh) return { configPath, path: pathValue };
+  // ssh keeps the first value it reads, so a Host block in the person's own file ("ControlMaster no",
+  // "ControlPath none") beats this file's `Host *`. Command-line -o is applied after every file and so
+  // restores the sharing that block turned off; without it every docker call paid a full handshake.
+  const controlPath = join(controlDir.replace(/%/g, "%%"), "cm-%C");
   const shim = [
     "#!/bin/sh",
     "# Written by OpenMausBot. docker's SSH transport finds this ssh first, so",
-    "# docker commands share one connection unless the alias turns that off.",
-    `exec ${shellQuote(realSsh)} -F ${shellQuote(configPath)} "$@"`,
+    "# docker commands share one connection; -o wins over the person's own Host block.",
+    `exec ${shellQuote(realSsh)} -F ${shellQuote(configPath)} -o ControlMaster=auto -o ${shellQuote(`ControlPath=${controlPath}`)} -o ControlPersist=10m "$@"`,
     "",
   ].join("\n");
   writeIfChanged(join(binDir, "ssh"), shim, 0o700);

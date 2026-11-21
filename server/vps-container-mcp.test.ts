@@ -48,7 +48,7 @@ describe.skipIf(process.platform === "win32")("VPS Cua MCP bridge", () => {
     const result = await runBridge(bin, input);
     expect(result.code).toBe(0);
     expect(result.stdout).toBe(input);
-    expect(result.stderr).toMatch(/SSH:-F .*[/\\]ssh[/\\]config -H ssh:\/\/production-vps exec/);
+    expect(result.stderr).toMatch(/SSH:-F .*[/\\]ssh[/\\]config -o ControlMaster=auto -o ControlPath=.* -o ControlPersist=10m -H ssh:\/\/production-vps exec/);
   });
 
   it("passes MCP bytes unchanged to docker exec over the validated SSH target", async () => {

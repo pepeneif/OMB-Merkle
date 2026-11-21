@@ -51,7 +51,9 @@ describe.skipIf(process.platform === "win32")("VPS SSH connection sharing on POS
     expect(setup.configPath).toBe(join(data, "ssh", "config"));
     expect(setup.path.split(":")[0]).toBe(join(data, "ssh", "bin"));
     const shim = readFileSync(join(data, "ssh", "bin", "ssh"), "utf8");
-    expect(shim).toContain(`exec '${realSsh}' -F '${setup.configPath}' "$@"`);
+    // -o must come after -F: a Host block in the person's file that says ControlMaster no otherwise wins.
+    expect(shim).toContain(`exec '${realSsh}' -F '${setup.configPath}' -o ControlMaster=auto -o 'ControlPath=`);
+    expect(shim).toContain(`-o ControlPersist=10m "$@"`);
     expect(statSync(join(data, "ssh", "bin", "ssh")).mode & 0o777).toBe(0o700);
     expect(statSync(setup.configPath!).mode & 0o777).toBe(0o600);
     expect(statSync(join(data, "ssh")).mode & 0o777).toBe(0o700);
@@ -114,7 +116,12 @@ describe.skipIf(process.platform === "win32")("VPS SSH connection sharing on POS
     const setup = prepareVpsSsh(data, bin, "linux");
     const result = spawnSync(join(data, "ssh", "bin", "ssh"), ["fixture-vps", "arg with spaces"], { encoding: "utf8" });
     expect(result.status, result.stderr).toBe(0);
-    expect(result.stdout.split("\n").slice(0, -1)).toEqual(["-F", setup.configPath, "fixture-vps", "arg with spaces"]);
+    const argv = result.stdout.split("\n").slice(0, -1);
+    // The person's arguments stay literal and last; the sharing flags sit between -F and the alias.
+    expect(argv.slice(0, 2)).toEqual(["-F", setup.configPath]);
+    expect(argv.slice(-2)).toEqual(["fixture-vps", "arg with spaces"]);
+    expect(argv).toContain("ControlMaster=auto");
+    expect(argv.find((arg) => arg.startsWith("ControlPath="))).toContain("/cm-%C");
   });
 
 });

@@ -527,6 +527,27 @@ describe("VPS computer", () => {
     expect(fake.calls.filter(({ args }) => args[2] === "run")).toHaveLength(1);
   });
 
+  it("mounts a running container on first use and proves the desktop only when a frame is asked for", async () => {
+    const fake = fixture();
+    const mounted = await vpsComputerAction("provision", CONFIG, BOT_ID, fake.runner, { deferDesktop: true });
+    expect(mounted.ready).toBe(true);
+    expect(mounted.desktopReady).toBe(false);
+    // No image or driver probe on the way to the first token.
+    expect(fake.calls.filter(({ args }) => args[2] === "image")).toHaveLength(1);
+    expect(fake.calls.filter(({ args }) => args.includes("get_desktop_state") && !args.includes("--screenshot-out-file"))).toHaveLength(0);
+    // The first frame is what proves the desktop, and it is the only thing that pays for it.
+    await vpsComputerScreenshot(CONFIG, BOT_ID, fake.runner);
+    expect(fake.calls.filter(({ args }) => args.includes("--screenshot-out-file")).length).toBeGreaterThan(0);
+  });
+
+  it("still verifies the whole desktop when it has to start a stopped container", async () => {
+    const fake = fixture({ running: false });
+    const started = await vpsComputerAction("provision", CONFIG, BOT_ID, fake.runner, { deferDesktop: true });
+    expect(started.ready).toBe(true);
+    expect(started.desktopReady).toBe(true);
+    expect(fake.calls.some(({ args }) => args[2] === "start")).toBe(true);
+  });
+
   it("returns an already-ready provision after one fresh inspection", async () => {
     const fake = fixture();
     expect((await vpsComputerAction("provision", CONFIG, BOT_ID, fake.runner)).ready).toBe(true);
@@ -564,8 +585,8 @@ describe("VPS computer", () => {
       }
       expect(inspections()).toBe(1);
 
-      // The ceiling still forces one full inspection, whatever the probes answered.
-      await vi.advanceTimersByTimeAsync(10 * 60_000);
+      // The ceiling still forces one full inspection, whatever the probes answered: one hour.
+      await vi.advanceTimersByTimeAsync(60 * 60_000);
       expect((await vpsComputerAction("provision", cfg, BOT_ID)).ready).toBe(true);
       expect(inspections()).toBe(2);
     } finally {
@@ -616,6 +637,21 @@ describe("VPS computer", () => {
       expect((await inspectVpsForAuto(cfg, BOT_ID)).ready).toBe(true);
       expect(fake.calls.filter(({ args }) => args[2] === "image")).toHaveLength(1);
       expect(fake.calls.filter(({ args }) => args.includes("get_desktop_state"))).toHaveLength(1);
+    } finally {
+      spawnMock.mockReset();
+      vi.useRealTimers();
+    }
+  });
+
+  it("skips the driver round trip for an Auto turn that only checks the container", async () => {
+    vi.useFakeTimers();
+    const cfg: AppConfig = { vps: { sshAlias: "auto-lazy-vps" } };
+    const fake = fixture();
+    mockTransport(async (args, options) => fake.runner(args, options));
+    try {
+      expect((await inspectVpsForAuto(cfg, BOT_ID, undefined, { desktop: false })).ready).toBe(true);
+      expect(fake.calls.some(({ args }) => args.includes("get_desktop_state"))).toBe(false);
+      expect(fake.calls.some(({ args }) => args.includes("health_report"))).toBe(false);
     } finally {
       spawnMock.mockReset();
       vi.useRealTimers();
