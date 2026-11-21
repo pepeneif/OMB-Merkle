@@ -154,8 +154,8 @@ export interface CompactionRecord {
   by: "person" | "harness";
 }
 
-export const DEFAULT_REBUILD_BYTES = 24_000;
-export const MAX_SUMMARY_BYTES = 6_000;
+export const DEFAULT_REBUILD_BYTES = 50_000;
+export const MAX_SUMMARY_BYTES = 24_000;
 const OMITTED_TEXT = "\n[Text shortened for context; the original remains in this conversation.]";
 
 /** UTF-8 prefixes must not end inside a code point. */

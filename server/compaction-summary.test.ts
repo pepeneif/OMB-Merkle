@@ -73,9 +73,23 @@ it("does not re-escape the previous summary across repeated manual compactions",
 it("falls back to quoting the entry when the prior summary is empty or blank", () => {
   for (const priorSummary of ["", "  \n "]) {
     const summary = deterministicSummary([{ id: "c", role: "assistant", text: "[summary]", priorSummary }, { id: "m", role: "user", text: "next" }]);
-    expect(summary).toContain('Assistant/record: "[summary]"');
-    expect(summary).toContain('User message: "next"');
+    expect(summary).toContain('Assistant: "[summary]"');
+    expect(summary).toContain('User: "next"');
   }
+});
+
+it("groups consecutive excerpts from one speaker under a single label", () => {
+  const run: ReplayEntry[] = [
+    { id: "a1", role: "assistant", text: "first" },
+    { id: "a2", role: "assistant", text: "second" },
+    { id: "a3", role: "assistant", text: "third" },
+    { id: "u1", role: "user", text: "correction: stop" },
+  ];
+  const summary = deterministicSummary(run);
+  expect(summary).toContain('Assistant (3 excerpts):\n- "first"\n- "second"\n- "third"');
+  expect(summary).toContain('User: "correction: stop"');
+  const labels = summary.split("\n").filter(line => /^(User|Assistant)( \(\d+ excerpts\))?:/.test(line));
+  expect(labels).toEqual(["Assistant (3 excerpts):", 'User: "correction: stop"']);
 });
 
 it("keeps a model-written prior summary verbatim", () => {
@@ -120,7 +134,7 @@ it("Stop prevents a late helper result from being committed, even if it ignores 
 
 it("bounds model output without losing the latest source correction", async () => {
   const result = await draftSummary(history, { signal: new AbortController().signal, generateText: async () => "model text ".repeat(10_000) });
-  expect(Buffer.byteLength(result)).toBeLessThanOrEqual(6_000);
+  expect(Buffer.byteLength(result)).toBeLessThanOrEqual(MAX_SUMMARY_BYTES);
   expect(result).toContain("may be incomplete");
   expect(result).toContain("Cancel deployment");
 });

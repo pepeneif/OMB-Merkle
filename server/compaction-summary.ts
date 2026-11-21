@@ -11,23 +11,44 @@ export function foldPoint(history: readonly ReplayEntry[], keepExchanges = 2): {
   return cut > 0 ? { folded: history.slice(0, cut), firstKeptId: history[cut]!.id } : null;
 }
 
-/** A provider-independent fallback: the newest source excerpts with provenance; never normalize text inside the quotes. */
+/** A provider-independent fallback: the newest source excerpts with provenance; never normalize text inside the quotes.
+ * Consecutive excerpts from one speaker share a single label, so labels cost a few bytes per run instead of per line. */
 export function deterministicSummary(history: readonly ReplayEntry[], maxBytes = MAX_SUMMARY_BYTES): string {
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 512) throw new Error("invalid summary budget");
-  let available = maxBytes - Buffer.byteLength(EXCERPT_SUMMARY_HEADER) - 96;
-  const lines: string[] = [];
-  let omitted = 0;
+  const perItem = Math.max(480, Math.floor(maxBytes / 6));
+  const keep: Array<{ role: string; text: string; prior?: string }> = [];
+  // Newest first: the oldest excerpts are the ones dropped when the budget runs out.
+  let spent = Buffer.byteLength(EXCERPT_SUMMARY_HEADER) + 96;
   for (let i = history.length - 1; i >= 0; i--) {
     const entry = history[i]!;
     if (!entry.text.trim()) continue;
     const prior = entry.priorSummary?.replace(EXCERPT_SUMMARY_HEADER, (m, at) => at === 0 ? "" : m).trim() || undefined;
-    const text = prior ?? `${entry.role === "user" ? "User message" : "Assistant/record"}: ${JSON.stringify(entry.text)}`;
-    const line = boundedContextText(text, Math.min(prior ? MAX_SUMMARY_BYTES : 1_600, available));
-    if (available < 128) { omitted++; continue; }
-    lines.unshift(line);
-    available -= Buffer.byteLength(line) + 1;
+    const text = prior ? "" : boundedContextText(JSON.stringify(entry.text), perItem);
+    const cost = prior ? Buffer.byteLength(prior) : Buffer.byteLength(text) + 3;
+    if (spent + cost > maxBytes) continue;
+    spent += cost;
+    keep.push(prior ? { role: entry.role, text, prior } : { role: entry.role, text });
   }
-  return [EXCERPT_SUMMARY_HEADER, ...(omitted ? [`[${omitted} earlier excerpts omitted]`] : []), ...lines].join("\n");
+  const omitted = history.filter(entry => entry.text.trim()).length - keep.length;
+  const blocks: string[] = [];
+  let run: { role: string; texts: string[] } | null = null;
+  const flush = () => {
+    if (!run || !run.texts.length) { run = null; return; }
+    const speaker = run.role === "user" ? "User" : "Assistant";
+    blocks.unshift(run.texts.length === 1
+      ? `${speaker}: ${run.texts[0]}`
+      : `${speaker} (${run.texts.length} excerpts):\n${run.texts.map(text => `- ${text}`).join("\n")}`);
+    run = null;
+  };
+  for (const item of keep) {
+    if (item.prior) { flush(); blocks.unshift(item.prior); continue; }
+    if (run && run.role !== item.role) flush();
+    if (!run) run = { role: item.role, texts: [] };
+    run.texts.unshift(item.text);
+  }
+  flush();
+  const out = [EXCERPT_SUMMARY_HEADER, ...(omitted > 0 ? [`[${omitted} earlier excerpts omitted]`] : []), ...blocks].join("\n");
+  return Buffer.byteLength(out) > maxBytes ? boundedContextText(out, maxBytes) : out;
 }
 
 export function summaryPrompt(history: readonly ReplayEntry[]): string {
@@ -65,5 +86,5 @@ export async function draftSummary(history: readonly ReplayEntry[], options: {
   finally { if (abort) signal.removeEventListener("abort", abort); }
   options.signal.throwIfAborted();
   if (!model?.trim()) return fallback;
-  return boundedContextText(`Model-written historical summary (may be incomplete):\n${boundedContextText(model.trim(), 2_600)}\n\n${deterministicSummary(history, 3_200)}`, MAX_SUMMARY_BYTES);
+  return boundedContextText(`Model-written historical summary (may be incomplete):\n${boundedContextText(model.trim(), 10_000)}\n\n${deterministicSummary(history, 13_000)}`, MAX_SUMMARY_BYTES);
 }
