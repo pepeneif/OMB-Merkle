@@ -115,6 +115,27 @@ it("compacts durably, keeps corrections and starts a fresh native session withou
   expect((await f.messages()).some(m => m.id === record.id)).toBe(true);
 }), 90_000);
 
+it("drops the pre-compaction reading when a summary lands, so no chip keeps showing it", () => fixture(async f => {
+  await f.send("OLDER_REQUEST use port 9000");
+  await f.send("CORRECTION use port 9001 instead");
+  // A measured reading that the header, composer and room chips all read from.
+  expect(f.task().usage.context).toMatchObject({ tokens: expect.any(Number) });
+  await f.compact();
+  await f.idle();
+  expect((await f.messages()).at(-1).kind).toBe("compaction");
+  expect(f.task().usage.context).toBeUndefined();
+  expect(f.task().usage.turns).toBeGreaterThan(0);
+  // A second click has nothing new to fold: it says so instead of doing nothing in silence.
+  const before = (await f.messages()).length;
+  await f.compact();
+  await f.idle();
+  const after = await f.messages();
+  expect(after).toHaveLength(before + 1);
+  expect(after.at(-1).kind).toBe("activity");
+  expect(String(after.at(-1).tool?.name)).toContain("nothing new to summarize");
+  expect(after.filter(m => m.kind === "compaction")).toHaveLength(1);
+}, false, { FAKE_CLAUDE_CONTEXT_TOKENS: "190000" }), 90_000);
+
 it("automatically folds old exchanges while keeping the two latest and the incoming request", () => fixture(async f => {
   await f.api("/api/config", { context: { compactAt: 1 } }, "PATCH");
   await f.send("FIRST_EXCHANGE historical request");

@@ -15,7 +15,7 @@ import { authorizeExternalRuntime, externalRuntimeIsActive, type ExternalRuntime
 import { z } from "zod";
 import { selectReplay, replayToolCalls, DEFAULT_REBUILD_BYTES, MAX_SUMMARY_BYTES } from "./context-rebuild.ts";
 import { draftSummary, foldPoint } from "./compaction-summary.ts";
-import { compactBudget, compactionReading, contextWindowFor, shouldCompact } from "./context-budget.ts";
+import { compactBudget, compactionReading, contextWindowFor, shouldCompact, withoutContextReading } from "./context-budget.ts";
 import { autoCompactWindow } from "./drivers/claude.ts";
 import { RoomContextTracker, roomResetNote } from "./room-context.ts";
 import { createRoomTranscript, GROUP_CONTEXT_MESSAGES } from "./host/room-transcript.ts";
@@ -6998,15 +6998,20 @@ async function compactConversation(input: {
   const messages = sinceFreshStart(store.activePath(threadId));
   const context = directContext(bot, threadId, messages);
   const record = latestCompaction(messages);
+  const nothingToFold = () => {
+    if (!manual || idle) return;
+    store.appendMessage(threadId, { role: "bot", kind: "activity", tool: {
+      name: "context compaction skipped — nothing new to summarize since the last summary", ok: true } });
+  };
   // A retry must apply the existing record before considering another fold.
   if (!manual && record && record.id !== task.appliedCompactionId) return;
-  if (manual && record?.id === messages.at(-1)?.id && !record?.firstKeptId) return;
+  if (manual && record?.id === messages.at(-1)?.id && !record?.firstKeptId) return nothingToFold();
   const selected = selectReplay(context, {
     budgetBytes: Math.max(1_024, context.reduce((n, entry) => n + Buffer.byteLength(entry.text) + 16, 0) + 4 * MAX_SUMMARY_BYTES + 1_024),
     maxMessages: Number.MAX_SAFE_INTEGER, excludedIds, compaction: record,
   });
   const history = selected.transcript.filter(entry => entry.id);
-  if (!history.length) return;
+  if (!history.length) return nothingToFold();
   const measurement = compactionReading(instance.adapter.capabilities, task.lastContextModel === `${instance.instanceId}:${model}` && !task.rewound ? task.usage?.context : undefined);
   const window = contextWindowFor(model, instance.models, measurement?.window);
   const bytes = history.reduce((n, entry) => n + Buffer.byteLength(entry.text), 0);
@@ -7019,11 +7024,11 @@ async function compactConversation(input: {
   if (!manual && !shouldCompact({ contextTokens: measurement?.tokens, estimatedBytes: bytes,
     budget: compactBudget(window, cfg.context?.compactAt, nativeCompactAt) * (idle ? HARNESS_IDLE_FRACTION : 1), floor, window, nativeCompactAt })) return;
   const fold = manual ? { folded: history, firstKeptId: "" } : foldPoint(history);
-  if (!fold) return;
+  if (!fold) return nothingToFold();
   const foldedThroughId = manual
     ? context.findLast(entry => !excludedIds.has(entry.id))?.id
     : fold.folded.at(-1)?.id;
-  if (!foldedThroughId) return;
+  if (!foldedThroughId) return nothingToFold();
   const prefix = JSON.stringify(messages);
   const controller = new AbortController(); idle?.addEventListener("abort", () => controller.abort(), { once: true }); if (idle?.aborted) controller.abort();
   compactionControllers.set(threadId, { generation, controller });
@@ -7040,6 +7045,9 @@ async function compactConversation(input: {
       compaction: { summary, firstKeptId: fold.firstKeptId, foldedThroughId,
         tokensBefore: measurement?.tokens ?? Math.ceil(bytes / 4), by: manual ? "person" : "harness" },
     }, { kind: "compaction.append", key: `${threadId}:${messages.at(-1)?.id}:${fold.firstKeptId}` });
+    // A reading taken before this summary says nothing about the conversation's size now. Drop it so no chip
+    // (header, composer, breakdown, room) keeps showing the pre-compaction number until a turn measures again.
+    if (task.usage?.context) store.patchTask(bot.id, threadId, { usage: withoutContextReading(task.usage) });
   } finally {
     if (compactionControllers.get(threadId)?.generation === generation) compactionControllers.delete(threadId);
   }

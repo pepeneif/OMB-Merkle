@@ -24,6 +24,14 @@ export function compactBudget(window: number, compactAt?: number, nativeCompactA
   return Math.max(1, Math.floor(Math.min(configured, window * 0.9, positive(nativeCompactAt) ? nativeCompactAt * 0.9 : Infinity)));
 }
 
+/** A reading taken before a summary says nothing about the conversation's size now: drop it, so every chip
+ * (header, composer, breakdown, room) stays quiet until a turn measures the conversation again. */
+export function withoutContextReading<T extends object>(usage: T & { context?: unknown }): T {
+  if (!usage.context) return usage;
+  const { context: _stale, ...rest } = usage;
+  return rest as T;
+}
+
 export function shouldCompact(input: { contextTokens?: number; estimatedBytes: number; budget: number; floor?: number; window: number; nativeCompactAt?: number }): boolean {
   // Summed input across tool rounds is NOT a context-window measurement.
   const size = positive(input.contextTokens) ? input.contextTokens : Math.ceil(input.estimatedBytes / 4);

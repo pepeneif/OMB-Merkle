@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { compactBudget, compactionReading, contextWindowFor, shouldCompact, DEFAULT_CONTEXT_WINDOW } from "./context-budget.ts";
+import { compactBudget, compactionReading, contextWindowFor, shouldCompact, withoutContextReading, DEFAULT_CONTEXT_WINDOW } from "./context-budget.ts";
 
 it("keeps compaction reachable below small model windows", () => {
   expect(compactBudget(8_000)).toBe(6_400);
@@ -45,4 +45,12 @@ it("times compaction from a driver's reading unless the driver reports it for th
   expect(window).toBe(DEFAULT_CONTEXT_WINDOW);
   expect(shouldCompact({ contextTokens: compactionReading({ contextReading: "meter" }, reading)?.tokens, estimatedBytes: 4_000,
     budget: compactBudget(window), window })).toBe(false);
+});
+
+it("drops a reading taken before a summary, and keeps everything else about the thread's usage", () => {
+  const usage = { input: 1_900, output: 12, cachedInput: 1_100, costUsd: null, turns: 7, context: { tokens: 229_871, window: 258_400 } };
+  expect(withoutContextReading(usage)).toEqual({ input: 1_900, output: 12, cachedInput: 1_100, costUsd: null, turns: 7 });
+  expect(usage.context).toEqual({ tokens: 229_871, window: 258_400 });
+  const plain = { input: 10, output: 0, costUsd: null, turns: 1 };
+  expect(withoutContextReading(plain)).toBe(plain);
 });
